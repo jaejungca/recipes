@@ -1,12 +1,14 @@
 ---
 title: "Week 2: Data Splitting and Preprocessing with recipes"
 subtitle: "IBM 6540 — Applied Machine Learning for Marketing"
-author: "Jae Jung"
+author: "Jae Min Jung"
 date: today
 format:
   html:
     toc: true
     toc-depth: 3
+    toc-expand: 1
+    toc-location: right-body
     toc-title: "Contents"
     code-fold: show
     code-tools: true
@@ -14,7 +16,6 @@ format:
     highlight-style: github
     df-print: paged
     embed-resources: true
-    output-dir: docs
 execute:
   warning: false
   message: false
@@ -55,6 +56,7 @@ We use a synthetic **direct-mail** dataset that mirrors a real acquisition campa
 
 ```{r load-data}
 # ── Synthetic direct-mail dataset ──────────────────────────────────────────────
+set.seed(123)
 n <- 3000
 
 mail_data <- tibble(
@@ -276,6 +278,11 @@ The golden rule: **fit everything on training data, apply to test data**.
 ## 3.2 Stratified Random Split
 
 ```{r split}
+mail_data |>
+  count(responded) |>
+  mutate(percent = n / sum(n))
+
+set.seed(617)
 mail_split <- initial_split(
   mail_data,
   prop = 0.80, # 80 % train, 20 % test
@@ -363,8 +370,7 @@ mail_train |>
     names_to = "variable",
     values_to = "pct_missing"
   ) |>
-  filter(pct_missing > 0) |>
-  arrange(desc(pct_missing))
+  filter(pct_missing > 0)
 ```
 
 ::: callout-important
@@ -469,13 +475,120 @@ mail_wf <- workflow() |>
 mail_wf
 ```
 
+## Regularization Concept
+
+::: {.callout-note title="Regularization: Ridge, Lasso, and Elastic Net"}
+
+## Why Regularization?
+
+Ordinary logistic regression finds coefficients that best fit the training data. 
+But with many predictors — common in marketing datasets with demographics, 
+behavioral variables, and RFM features — the model can **overfit**: it learns 
+the noise in the training data rather than the true signal, and performs poorly 
+on new customers.
+
+Regularization fixes this by adding a **penalty term** to the loss function that 
+discourages large coefficients. The model is forced to be simpler, which usually 
+means it generalizes better to new data.
+
+The penalized loss function looks like this:
+
+$$\text{Loss} = \text{(fit to training data)} + \lambda \cdot \text{(penalty on coefficients)}$$
+
+The $\lambda$ (`penalty`) parameter controls how hard we squeeze the coefficients:
+
+- $\lambda = 0$: no regularization, ordinary logistic regression
+- Large $\lambda$: heavy shrinkage, very simple model
+
+---
+
+## Three Flavors of Regularization
+
+### Ridge (L2)
+
+Ridge adds the **sum of squared coefficients** as the penalty:
+
+$$\text{Penalty} = \sum_{j} \beta_j^2$$
+
+Ridge shrinks all coefficients toward zero but **never sets them exactly to zero**. 
+Every predictor stays in the model, just with a smaller influence. This works well 
+when you believe most predictors are genuinely useful and want to reduce their 
+magnitude without discarding any.
+
+In `tidymodels`: `mixture = 0`
+
+### Lasso (L1)
+
+Lasso adds the **sum of absolute coefficients** as the penalty:
+
+$$\text{Penalty} = \sum_{j} |\beta_j|$$
+
+Lasso can shrink coefficients all the way to **exactly zero**, effectively removing 
+those predictors from the model. This makes Lasso a built-in **variable selection** 
+tool — it produces a sparse model that only keeps the most important predictors. 
+In a direct-mail context, this is useful when you have dozens of customer attributes 
+and want the model to tell you which ones actually drive response.
+
+In `tidymodels`: `mixture = 1`
+
+### Elastic Net
+
+Elastic net **blends Ridge and Lasso**:
+
+$$\text{Penalty} = \alpha \sum_{j} |\beta_j| + (1 - \alpha) \sum_{j} \beta_j^2$$
+
+The `mixture` parameter ($\alpha$) controls the blend:
+
+| `mixture` | Behavior |
+|-----------|----------|
+| `1`       | Pure Lasso |
+| `0`       | Pure Ridge |
+| `0.5`     | Equal blend of both |
+
+Elastic net is often the safest default when you are unsure: it can do variable 
+selection like Lasso while handling correlated predictors more stably (Lasso tends 
+to arbitrarily pick one variable from a correlated group; elastic net can keep both 
+with reduced coefficients).
+
+In `tidymodels`: `0 < mixture < 1`
+
+---
+
+## Choosing $\lambda$
+
+The `penalty` value ($\lambda$) is a **hyperparameter** — it is not learned from 
+the data during model fitting. Instead, it must be chosen beforehand or tuned using cross-validation. A common workflow in `tidymodels` is to replace the fixed value with `tune()` and search over a grid of candidates:
+
+```r
+lr_spec <- logistic_reg(penalty = tune(), mixture = 1) |>
+  set_engine("glmnet") |>
+  set_mode("classification")
+```
+
+For now, we use `penalty = 0.01` as a reasonable starting value. Later in the 
+course we will tune this properly.
+
+---
+
+## Quick Reference
+
+| Method       | Penalty type      | Zeroes out predictors? | Best when...                          |
+|--------------|-------------------|------------------------|---------------------------------------|
+| Ridge        | Sum of squares    | No                     | Most predictors are useful            |
+| Lasso        | Sum of absolutes  | Yes                    | Many irrelevant predictors            |
+| Elastic net  | Blend of both     | Sometimes              | Unsure, or predictors are correlated  |
+
+:::
+
+## Fitting and Predicting
+
 ```{r fit-workflow}
 # Fit on training data
 mail_fit <- fit(mail_wf, data = mail_train)
 
 # Predict on test data
 preds <- augment(mail_fit, new_data = mail_test)
-head(preds |> select(customer_id, responded, .pred_class, .pred_yes))
+preds |> select(customer_id, responded, .pred_class, .pred_yes) |> head()
 ```
 
 ```{r eval-metrics}
@@ -496,13 +609,13 @@ tidy(mail_prep)
 ```
 
 ```{r tidy-step}
-# Inspect normalization statistics (step 4 = step_normalize)
-tidy(mail_prep, number = 4) |> arrange(terms)
+# Inspect normalization statistics (step 3 = step_normalize)
+tidy(mail_prep, number = 3) |> arrange(terms)
 ```
 
 ```{r tidy-impute}
-# Inspect imputation values (step 2 = step_impute_median)
-tidy(mail_prep, number = 2)
+# Inspect imputation values (step 1 = step_impute_median)
+tidy(mail_prep, number = 1)
 ```
 
 ------------------------------------------------------------------------
