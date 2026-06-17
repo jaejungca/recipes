@@ -1,0 +1,453 @@
+---
+title: "Week 2: Data Splitting and Preprocessing with recipes"
+subtitle: "IBM 6540 — Applied Machine Learning for Marketing"
+author: "Jae Jung"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Contents"
+    code-fold: show
+    code-tools: true
+    theme: cosmo
+    highlight-style: github
+    df-print: paged
+    embed-resources: true
+execute:
+  warning: false
+  message: false
+  freeze: true
+---
+
+# Learning Objectives
+
+By the end of this notebook you will be able to:
+
+1. Split data into training and test sets in a principled way using `rsample`
+2. Explain *why* preprocessing must be learned on training data only
+3. Build a `recipe()` pipeline for common transformations: log scaling, dummy encoding, imputation, and normalization
+4. Inspect and debug a recipe with `prep()` / `bake()`
+5. Connect a recipe to a model inside a `workflow()`
+
+> **Textbook reference:** *Tidy Modeling with R* (TMWR), Chapters 5 & 8
+> ([https://www.tmwr.org/splitting](https://www.tmwr.org/splitting), [https://www.tmwr.org/recipes](https://www.tmwr.org/recipes))
+
+---
+
+# 1 Setup
+
+```{r setup}
+library(tidymodels) # umbrella: rsample, recipes, parsnip, workflows, yardstick
+library(tidyverse)
+library(janitor) # clean_names()
+library(skimr) # skim()
+
+tidymodels_prefer() # resolve function-name conflicts
+set.seed(2024)
+```
+
+---
+
+# 2 The Marketing Dataset
+
+We use a synthetic direct-mail dataset that mirrors a real acquisition campaign.
+Each row is one prospect; the outcome is whether they **responded** (bought).
+
+```{r load-data}
+# ── Synthetic direct-mail dataset ──────────────────────────────────────────────
+n <- 3000
+
+mail_data <- tibble(
+  customer_id = paste0("C", str_pad(1:n, 5, pad = "0")),
+  age = round(rnorm(n, mean = 45, sd = 12)),
+  income = round(rlnorm(n, meanlog = 10.8, sdlog = 0.6)), # right-skewed
+  recency_days = round(rexp(n, rate = 1 / 60)), # days since last purchase
+  freq_12mo = rpois(n, lambda = 3), # purchases in 12 months
+  avg_order_amt = round(rlnorm(n, meanlog = 4.2, sdlog = 0.5), 2),
+  channel = sample(
+    c("email", "direct_mail", "digital"),
+    n,
+    replace = TRUE,
+    prob = c(0.5, 0.3, 0.2)
+  ),
+  region = sample(
+    c("West", "South", "Midwest", "Northeast"),
+    n,
+    replace = TRUE
+  ),
+  loyalty_tier = sample(
+    c("Bronze", "Silver", "Gold", "Platinum"),
+    n,
+    replace = TRUE,
+    prob = c(0.4, 0.3, 0.2, 0.1)
+  ),
+  # introduce ~8 % missingness in income and avg_order_amt
+  responded = rbinom(
+    n,
+    1,
+    prob = plogis(
+      -3 +
+        0.02 * (age - 45) +
+        0.3 * log(income / 50000) +
+        0.1 * freq_12mo -
+        0.005 * recency_days
+    )
+  )
+) |>
+  mutate(
+    income = if_else(runif(n) < 0.08, NA_real_, income),
+    avg_order_amt = if_else(runif(n) < 0.05, NA_real_, avg_order_amt),
+    responded = factor(responded, levels = c(1, 0), labels = c("yes", "no"))
+  )
+
+glimpse(mail_data)
+```
+
+```{r skim}
+skim(mail_data)
+```
+
+::: callout-note
+**Marketing context.** Notice that `income` and `avg_order_amt` are right-skewed
+(typical for financial variables) and contain missing values — two very common
+real-world preprocessing challenges.
+:::
+
+---
+
+# 3 Data Splitting
+
+## 3.1 Why We Split
+
+The test set simulates **unseen future customers**. Any transformation parameter
+(mean, standard deviation, imputation value) estimated on the full dataset
+"leaks" information about the test set into the model — this is called **data
+leakage** and leads to overly optimistic performance estimates.
+
+The golden rule: **fit everything on training data, apply to test data**.
+
+## 3.2 Stratified Random Split
+
+```{r split}
+mail_split <- initial_split(
+  mail_data,
+  prop = 0.80, # 80 % train, 20 % test
+  strata = responded # preserve class balance in both sets
+)
+
+mail_train <- training(mail_split)
+mail_test <- testing(mail_split)
+
+cat("Training rows:", nrow(mail_train), "\n")
+cat("Test rows    :", nrow(mail_test), "\n")
+```
+
+```{r check-balance}
+# Verify class balance is preserved
+bind_rows(
+  mail_train |> count(responded) |> mutate(set = "train"),
+  mail_test |> count(responded) |> mutate(set = "test")
+) |>
+  group_by(set) |>
+  mutate(pct = n / sum(n) * 100)
+```
+
+::: callout-tip
+**Marketing note.** Direct-mail response rates are typically 1–5 %. Stratification
+ensures the rare "yes" class is represented in both sets. Without it, a small
+test set might have almost no responders by chance.
+:::
+
+## 3.3 ✏️ Exercise 3.1
+
+Change `prop` to `0.70` and re-run the split. How many records move from training
+to test? How does the response rate change?
+
+```{r ex3-1, eval=FALSE}
+# Your code here
+
+```
+
+---
+
+# 4 Building a Recipe
+
+A `recipe` is a **reusable preprocessing script** tied to a specific formula and
+training dataset. Steps are declared with `step_*()` functions; nothing is
+computed until you call `prep()`.
+
+## 4.1 Step-by-Step Construction
+
+```{r recipe-build}
+mail_rec <- recipe(responded ~ ., data = mail_train) |>
+
+  # ── Step 1: Remove ID column (not a predictor) ────────────────────────────
+  update_role(customer_id, new_role = "ID") |>
+
+  # ── Step 2: Impute missing numeric values with the median ─────────────────
+  step_impute_median(all_numeric_predictors()) |>
+
+  # ── Step 3: Log-transform right-skewed numeric predictors ─────────────────
+  step_log(income, avg_order_amt, recency_days, base = 10, offset = 1) |>
+
+  # ── Step 4: Normalize (center + scale) all numeric predictors ─────────────
+  step_normalize(all_numeric_predictors()) |>
+
+  # ── Step 5: Create dummy variables from nominal predictors ─────────────────
+  step_dummy(all_nominal_predictors()) |>
+
+  # ── Step 6: Remove zero-variance predictors (safety net) ──────────────────
+  step_zv(all_predictors())
+
+mail_rec
+```
+
+### What did we just build?
+
+```{r recipe-summary}
+summary(mail_rec) # variable roles
+```
+
+## 4.2 Deep Dive: Each Step
+
+### 4.2.1 Imputation (`step_impute_median`)
+
+```{r imputation-demo}
+# How much is missing?
+mail_train |>
+  summarise(across(everything(), ~ mean(is.na(.)) * 100)) |>
+  pivot_longer(
+    everything(),
+    names_to = "variable",
+    values_to = "pct_missing"
+  ) |>
+  filter(pct_missing > 0) |>
+  arrange(desc(pct_missing))
+```
+
+::: callout-important
+**Why median and not mean?** The median is robust to the same right-skew that makes
+these variables candidates for log transformation. Using the mean on a skewed
+distribution would impute an "average" that may not represent the typical customer.
+:::
+
+### 4.2.2 Log Transformation (`step_log`)
+
+```{r log-demo}
+# Visual: income before and after log10
+p1 <- mail_train |>
+  filter(!is.na(income)) |>
+  ggplot(aes(income)) +
+  geom_histogram(bins = 40, fill = "steelblue", alpha = 0.7) +
+  labs(title = "Income — raw", x = "income ($)")
+
+p2 <- mail_train |>
+  filter(!is.na(income)) |>
+  ggplot(aes(log10(income))) +
+  geom_histogram(bins = 40, fill = "darkorange", alpha = 0.7) +
+  labs(title = "Income — log10", x = "log10(income)")
+
+library(patchwork)
+p1 + p2
+```
+
+### 4.2.3 Normalization (`step_normalize`)
+
+Centering and scaling puts all numeric variables on the same unit-free scale.
+This is *required* for distance-based models (KNN, SVM) and strongly recommended
+for logistic regression with regularization.
+
+```{r normalize-demo}
+# Prep just the first three steps to see the effect of normalization
+rec_partial <- recipe(
+  responded ~ income + freq_12mo + age,
+  data = mail_train
+) |>
+  step_impute_median(all_numeric_predictors()) |>
+  step_log(income, base = 10, offset = 1) |>
+  step_normalize(all_numeric_predictors())
+
+prep(rec_partial) |>
+  bake(new_data = mail_train) |>
+  summary()
+```
+
+### 4.2.4 Dummy Variables (`step_dummy`)
+
+```{r dummy-demo}
+# Inspect how many dummies will be created
+mail_train |>
+  select(channel, region, loyalty_tier) |>
+  summarise(
+    channel_levels = n_distinct(channel),
+    region_levels = n_distinct(region),
+    loyalty_tier_levels = n_distinct(loyalty_tier)
+  )
+```
+
+`step_dummy()` creates $k - 1$ columns per factor (reference encoding) to avoid
+perfect multicollinearity.
+
+---
+
+# 5 Preparing and Baking
+
+`prep()` **estimates** all statistics from the training data.
+`bake()` **applies** those statistics to any dataset.
+
+```{r prep-bake}
+mail_prep <- prep(mail_rec) # learns medians, means, SDs, factor levels
+
+# Apply to training data (already done internally, but good to inspect)
+train_baked <- bake(mail_prep, new_data = NULL)
+glimpse(train_baked)
+```
+
+```{r bake-test}
+# Apply to test data — uses training statistics, NOT test statistics
+test_baked <- bake(mail_prep, new_data = mail_test)
+glimpse(test_baked)
+```
+
+::: callout-warning
+**Common mistake.** Calling `prep()` on the test data separately would re-estimate
+the normalization parameters from test data. Always `prep()` on training, then
+`bake()` new data through the trained recipe.
+:::
+
+---
+
+# 6 Connecting the Recipe to a Model Workflow
+
+In `tidymodels`, a `workflow` bundles the recipe + model so both are fitted and
+applied together — no chance of forgetting preprocessing.
+
+```{r workflow}
+# Model specification
+lr_spec <- logistic_reg(penalty = 0.01, mixture = 1) |> # Lasso
+  set_engine("glmnet") |>
+  set_mode("classification")
+
+# Workflow
+mail_wf <- workflow() |>
+  add_recipe(mail_rec) |>
+  add_model(lr_spec)
+
+mail_wf
+```
+
+```{r fit-workflow}
+# Fit on training data
+mail_fit <- fit(mail_wf, data = mail_train)
+
+# Predict on test data
+preds <- augment(mail_fit, new_data = mail_test)
+head(preds |> select(customer_id, responded, .pred_class, .pred_yes))
+```
+
+```{r eval-metrics}
+# Classification metrics
+metrics <- metric_set(accuracy, roc_auc, sens, spec)
+
+preds |>
+  metrics(truth = responded, estimate = .pred_class, .pred_yes)
+```
+
+---
+
+# 7 Inspecting and Debugging a Recipe
+
+```{r tidy-recipe}
+# See what each step will do / has done (after prep)
+tidy(mail_prep)
+```
+
+```{r tidy-step}
+# Inspect normalization statistics (step 4 = step_normalize)
+tidy(mail_prep, number = 4) |> arrange(terms)
+```
+
+```{r tidy-impute}
+# Inspect imputation values (step 2 = step_impute_median)
+tidy(mail_prep, number = 2)
+```
+
+---
+
+# 8 Exercises
+
+## ✏️ Exercise 8.1 — Alternative Imputation
+
+Replace `step_impute_median()` with `step_impute_mean()`. Re-prep the recipe
+and compare the imputed values. Which would you prefer for `income` and why?
+
+```{r ex8-1, eval=FALSE}
+# Your code here
+
+```
+
+## ✏️ Exercise 8.2 — Different Encoding
+
+`loyalty_tier` is ordinal (Bronze < Silver < Gold < Platinum). Replace
+`step_dummy()` with `step_ordinalscore()` for `loyalty_tier` only. Does this
+change the number of columns in the baked data?
+
+```{r ex8-2, eval=FALSE}
+# Hint: use step_ordinalscore() from the recipes package
+# Your code here
+
+```
+
+## ✏️ Exercise 8.3 — Interaction Term
+
+Add an interaction between `freq_12mo` and `log10(income)` using
+`step_interact()`. What is the marketing intuition for this interaction?
+
+```{r ex8-3, eval=FALSE}
+# Your code here
+
+```
+
+## ✏️ Exercise 8.4 — Remove a Step
+
+Remove `step_normalize()` from the recipe, retrain the Lasso, and compare
+`roc_auc` before and after. What happens to model performance?
+
+```{r ex8-4, eval=FALSE}
+# Your code here
+
+```
+
+## ✏️ Exercise 8.5 — Stratification Check
+
+The split used `strata = responded`. Remove stratification and re-split five
+times. Calculate the standard deviation of the response rate in the test sets.
+Does stratification reduce variance?
+
+```{r ex8-5, eval=FALSE}
+# Your code here
+
+```
+
+---
+
+# 9 Summary
+
+| Concept | Function | Key Argument |
+|---|---|---|
+| Data split | `initial_split()` | `prop`, `strata` |
+| Training set | `training()` | — |
+| Test set | `testing()` | — |
+| Define recipe | `recipe()` | formula, `data = train` |
+| Log transform | `step_log()` | `base`, `offset` |
+| Median impute | `step_impute_median()` | selector |
+| Normalize | `step_normalize()` | selector |
+| Dummy encode | `step_dummy()` | `all_nominal_predictors()` |
+| Estimate steps | `prep()` | `training = train` |
+| Apply steps | `bake()` | `new_data = test` |
+| Bundle recipe + model | `workflow()` | — |
+
+```{r session-info}
+sessionInfo()
+```

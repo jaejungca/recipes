@@ -1,0 +1,1039 @@
+---
+title: "Chapter 8: Feature Engineering with `recipes`"
+subtitle: "IBM 6540 — Applied Machine Learning for Marketing"
+author: "Jae Jung"
+date: today
+format:
+  html:
+    toc: true
+    toc-location: right-body
+    toc-depth: 3
+    toc-title: "Chapter Contents"
+    number-sections: true
+    theme: cosmo
+    highlight-style: github
+    code-fold: false
+    code-tools: true
+    df-print: paged
+    fig-width: 8
+    fig-height: 5
+    embed-resources: true
+execute:
+  warning: false
+  message: false
+  freeze: true
+---
+
+```{r setup}
+#| label: setup
+#| include: false
+library(tidymodels)
+library(patchwork)
+library(splines)
+tidymodels_prefer()
+
+# Reproduce the Ames data splits from the book
+data(ames)
+ames <- mutate(ames, Sale_Price = log10(Sale_Price))
+set.seed(502)
+ames_split <- initial_split(ames, prop = 0.80, strata = Sale_Price)
+ames_train <- training(ames_split)
+ames_test <- testing(ames_split)
+```
+
+---
+
+> **Chapter source:** Kuhn & Silge, *Tidy Modeling with R*, Chapter 8 —
+> <https://www.tmwr.org/recipes>
+>
+> **Learning objectives for this notebook:**
+>
+> 1.  Understand *why* feature engineering matters and when it helps
+> 2.  Build, inspect, and apply `recipe()` objects step by step
+> 3.  Know the most important `step_*()` functions and when to use each
+> 4.  Integrate a recipe into a `workflow()` correctly
+> 5.  Use `tidy()` to inspect what a recipe learned from training data
+> 6.  Understand the `skip` argument and data-leakage risks
+
+---
+
+# Why Feature Engineering?
+
+Raw predictor columns are rarely in the best form for a model. **Feature
+engineering** reshapes and enriches predictors so a model can extract
+signal more efficiently.
+
+Common motivations:
+
+| Motivation | Example |
+|---------------------------------------------|---------------------------|
+| Represent non-linear patterns | spline expansion of latitude |
+| Put predictors on a common scale | `step_normalize()` |
+| Reduce correlated predictors | PCA via `step_pca()` |
+| Encode qualitative data numerically | `step_dummy()` |
+| Handle rare categories | `step_other()` |
+| Impute missing values | `step_impute_mean()` |
+
+::: callout-tip
+## Marketing relevance
+
+In marketing datasets you'll routinely encounter: sparse categorical
+variables (campaign IDs, product SKUs), skewed spend/revenue columns,
+and high-dimensional customer segments. `recipes` handles all of these
+in a reproducible, pipeline-safe way.
+:::
+
+---
+
+# A First `recipe()` — The Ames Housing Data
+
+## The problem
+
+We want to predict `Sale_Price` (already log₁₀-transformed) using four
+predictors:
+
+-   `Neighborhood` — qualitative, 29 levels
+-   `Gr_Liv_Area` — continuous square footage (right-skewed)
+-   `Year_Built` — continuous
+-   `Bldg_Type` — qualitative, 5 levels
+
+The equivalent base-R formula would be:
+
+```{r formula-equivalent}
+#| eval: false
+lm(
+  Sale_Price ~ Neighborhood + log10(Gr_Liv_Area) + Year_Built + Bldg_Type,
+  data = ames_train
+)
+```
+
+## Building the recipe
+
+A recipe **specifies** preprocessing steps without immediately executing
+them — estimation happens later, during `fit()`.
+
+```{r simple-recipe}
+simple_ames <-
+  recipe(
+    Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+    data = ames_train
+  ) %>%
+  step_log(Gr_Liv_Area, base = 10) %>% # log-transform living area
+  step_dummy(all_nominal_predictors()) # dummies for all factor cols
+
+simple_ames
+```
+
+::: callout-note
+## What just happened?
+
+-   `recipe(..., data = ames_train)` — assigns **roles** (predictor /
+    outcome) and inspects column *types*; the data values are not yet
+    used.
+-   `step_log()` — registers a log transformation to be applied later.
+-   `step_dummy()` — registers dummy encoding of all factor/character
+    predictors.
+-   `all_nominal_predictors()` is a recipe-specific selector — like
+    `starts_with()` in dplyr, but role-aware.
+:::
+
+## Why recipes beat formulas
+
+| Feature | Base-R formula | `recipes` |
+|---------------------------|----------------|-----------------|
+| Reuse across multiple models | ✗ | ✓ |
+| Handles 100+ dummy columns cleanly | tedious | ✓ (`all_nominal_predictors()`) |
+| Prevents data leakage | limited | ✓ (fit-time estimation) |
+| Inspect what was learned | ✗ | ✓ (`tidy()`) |
+| Extend with custom steps | limited | ✓ |
+
+---
+
+# Using a Recipe Inside a Workflow
+
+Recipes are meant to live inside a `workflow()` — this couples
+preprocessing and modeling so that everything is estimated together.
+
+```{r lm-setup}
+# Define the model
+lm_model <- linear_reg() %>% set_engine("lm")
+
+# Build a workflow — note: only one preprocessor allowed at a time
+lm_wflow <-
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(simple_ames)
+
+lm_wflow
+```
+
+## Fit the workflow
+
+`fit()` does two things in sequence: (1) **prepares** the recipe using
+`ames_train`, then (2) **fits** the model on the preprocessed training
+data.
+
+```{r fit-workflow}
+lm_fit <- fit(lm_wflow, ames_train)
+lm_fit
+```
+
+## Predict on new data
+
+`predict()` automatically applies the *same* preprocessing that was
+used at training time — no manual re-transformation needed.
+
+```{r predict-new}
+predict(lm_fit, ames_test %>% slice(1:5))
+```
+
+## Extract internals
+
+```{r extract-recipe}
+# Inspect the trained recipe
+lm_fit %>%
+  extract_recipe(estimated = TRUE)
+```
+
+```{r extract-model}
+# Inspect model coefficients (first 8)
+lm_fit %>%
+  extract_fit_parsnip() %>%
+  tidy() %>%
+  slice(1:8)
+```
+
+::: callout-important
+## Data leakage checkpoint
+
+All parameters estimated by a recipe step (means, standard deviations,
+PCA loadings, factor levels) are computed **only on training data**. When
+`predict()` is called on new data, those stored parameters are re-applied
+— not re-estimated. This is a core guarantee of the `recipes` framework.
+:::
+
+---
+
+# How Data Flow Through a Recipe
+
+```{r data-flow-diagram}
+#| echo: false
+#| fig-cap: "Data flow in a tidymodels recipe + workflow"
+# A simple text diagram via a styled knitr output
+cat(
+  "  recipe(formula, data = train)     ← column TYPES inferred here
+         │
+         ▼
+  step_*() chain registered          ← no data used yet
+         │
+    fit(workflow, train)
+         │
+         ├─► prep(recipe, train)     ← parameters ESTIMATED on train
+         │         log means, dummy levels, PCA weights, etc.
+         │
+         └─► fit(model, baked_train) ← model fitted on preprocessed train
+         
+  predict(workflow, new_data)
+         │
+         ├─► bake(recipe, new_data)  ← stored params APPLIED (not re-estimated)
+         └─► predict(model, ...)     ← predictions returned
+"
+)
+```
+
+::: callout-warning
+## The golden rule
+
+**Never** pass test or holdout data to `recipe()` or `prep()` for
+parameter estimation. The `workflows` package enforces this for you
+when you call `fit(workflow, train)` and `predict(workflow, test)`.
+:::
+
+---
+
+# Important Recipe Steps
+
+## Encoding qualitative variables: `step_dummy()` and friends
+
+### Rare levels with `step_other()`
+
+```{r neighborhood-bar}
+#| fig-cap: "Neighborhood frequencies in the Ames training set — note the rare levels"
+ames_train %>%
+  count(Neighborhood, sort = TRUE) %>%
+  ggplot(aes(x = n, y = reorder(Neighborhood, n))) +
+  geom_col(fill = "#3B7DD8", alpha = 0.8) +
+  geom_vline(
+    xintercept = 0.01 * nrow(ames_train),
+    linetype = "dashed",
+    colour = "firebrick"
+  ) +
+  annotate(
+    "text",
+    x = 0.01 * nrow(ames_train) + 3,
+    y = 3,
+    label = "1% threshold",
+    colour = "firebrick",
+    size = 3.2
+  ) +
+  labs(
+    x = "Count",
+    y = NULL,
+    title = "Neighborhoods with < 1% of training rows will be pooled into 'other'"
+  )
+```
+
+When rare levels exist, `step_other()` pools them into a single `"other"` category — 
+avoiding near-zero-variance dummies that confuse most models.
+
+```{r step-other-recipe}
+simple_ames <-
+  recipe(
+    Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+    data = ames_train
+  ) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01) %>% # ← pool rare levels
+  step_dummy(all_nominal_predictors())
+
+simple_ames
+```
+
+### How dummy variables work
+
+For `Bldg_Type` with five levels, `step_dummy()` creates **four** binary
+columns (the first level, `OneFam`, becomes the reference):
+
+| Original | TwoFmCon | Duplex | Twnhs | TwnhsE |
+|----------|----------|--------|-------|--------|
+| OneFam | 0 | 0 | 0 | 0 |
+| TwoFmCon | 1 | 0 | 0 | 0 |
+| Duplex | 0 | 1 | 0 | 0 |
+| Twnhs | 0 | 0 | 1 | 0 |
+| TwnhsE | 0 | 0 | 0 | 1 |
+
+::: callout-note
+Use `one_hot = TRUE` inside `step_dummy()` if you need all five
+columns (required by some tree-based models and neural networks).
+:::
+
+## Interaction terms: `step_interact()`
+
+First, let's visualise whether the relationship between `Gr_Liv_Area`
+and `Sale_Price` differs by building type — the classic motivation for
+an interaction term.
+
+```{r interaction-plot}
+#| fig-cap: "Different slopes by building type suggest an interaction term is warranted"
+ggplot(ames_train, aes(x = Gr_Liv_Area, y = 10^Sale_Price)) +
+  geom_point(alpha = 0.15, size = 0.9) +
+  facet_wrap(~Bldg_Type, nrow = 1) +
+  geom_smooth(method = lm, formula = y ~ x, se = FALSE, colour = "#3B7DD8") +
+  scale_x_log10() +
+  scale_y_log10(labels = scales::dollar) +
+  labs(
+    x = "Gross Living Area (log scale)",
+    y = "Sale Price USD (log scale)",
+    title = "Slopes differ across building types → add an interaction term"
+  )
+```
+
+Slopes clearly differ. To capture this in a recipe, we add
+`step_interact()` **after** dummies have already been created:
+
+```{r step-interact-recipe}
+simple_ames <-
+  recipe(
+    Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+    data = ames_train
+  ) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  # Interact log(Gr_Liv_Area) with each Bldg_Type dummy column
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_"))
+
+simple_ames
+```
+
+::: callout-important
+## Order matters!
+
+`step_interact()` must come **after** `step_dummy()`. Interactions are
+formed from the columns as they exist at that point in the recipe chain —
+not from the original data.
+:::
+
+## Spline functions: `step_ns()`
+
+When a continuous predictor has a **nonlinear** relationship with the
+outcome, splines expand that single column into multiple basis columns
+that together capture the curve.
+
+```{r spline-plot}
+#| fig-cap: "Natural splines with increasing degrees of freedom — 2 underfits, 100 overfits"
+plot_smoother <- function(deg_free) {
+  ggplot(ames_train, aes(x = Latitude, y = 10^Sale_Price)) +
+    geom_point(alpha = 0.15, size = 0.7) +
+    scale_y_log10(labels = scales::dollar) +
+    geom_smooth(
+      method = lm,
+      formula = y ~ ns(x, df = deg_free),
+      colour = "#3B7DD8",
+      se = FALSE
+    ) +
+    labs(
+      title = paste(deg_free, "spline terms"),
+      y = "Sale Price",
+      x = "Latitude"
+    )
+}
+
+(plot_smoother(2) + plot_smoother(5)) /
+  (plot_smoother(20) + plot_smoother(100))
+```
+
+```{r spline-recipe}
+spline_recipe <-
+  recipe(
+    Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type + Latitude,
+    data = ames_train
+  ) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_")) %>%
+  step_ns(Latitude, deg_free = 20) # ← natural spline with 20 df
+
+spline_recipe
+```
+
+::: callout-tip
+The right number of spline terms is a **tuning parameter** (Chapter 12).
+Start with 5–20 and let cross-validation guide the choice.
+:::
+
+## Feature extraction: `step_pca()`
+
+When several predictors are correlated (e.g., multiple house-size
+columns), PCA compresses them into a smaller set of uncorrelated
+components.
+
+```{r size-correlation}
+#| fig-cap: "Size-related predictors are highly correlated — good PCA candidates"
+ames_train %>%
+  select(matches("(SF$)|(Gr_Liv)")) %>%
+  cor(use = "pairwise.complete.obs") %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("var1") %>%
+  tidyr::pivot_longer(-var1, names_to = "var2", values_to = "r") %>%
+  ggplot(aes(var1, var2, fill = r)) +
+  geom_tile(colour = "white") +
+  geom_text(aes(label = round(r, 2)), size = 3) +
+  scale_fill_gradient2(
+    low = "#D7191C",
+    mid = "white",
+    high = "#2C7BB6",
+    midpoint = 0,
+    limits = c(-1, 1)
+  ) +
+  theme(axis.text.x = element_text(angle = 35, hjust = 1)) +
+  labs(
+    x = NULL,
+    y = NULL,
+    title = "Correlation matrix of square-footage predictors",
+    fill = "r"
+  )
+```
+
+```{r pca-recipe}
+pca_recipe <-
+  recipe(
+    Sale_Price ~ Neighborhood +
+      Gr_Liv_Area +
+      Year_Built +
+      Bldg_Type +
+      Total_Bsmt_SF +
+      First_Flr_SF +
+      Gr_Liv_Area,
+    data = ames_train
+  ) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01) %>%
+  step_normalize(matches("(SF$)|(Gr_Liv)")) %>% # PCA requires same scale
+  step_pca(matches("(SF$)|(Gr_Liv)"), num_comp = 2) %>%
+  step_dummy(all_nominal_predictors())
+
+pca_recipe
+```
+
+::: callout-note
+`step_normalize()` (center + scale) must precede `step_pca()` because
+PCA is sensitive to the units of each column.
+:::
+
+## Row sampling: `step_downsample()` / `step_upsample()`
+
+When class imbalance is severe (e.g., a 5% fraud rate), the model may
+learn to always predict "not fraud." Subsampling at the recipe level
+fixes this.
+
+```{r downsample-example}
+#| eval: false
+# Requires: library(themis)
+library(themis)
+
+imbalanced_recipe <-
+  recipe(Churn ~ ., data = customer_train) %>%
+  step_downsample(Churn) # skip = TRUE by default → not applied at predict time
+```
+
+::: callout-warning
+Subsampling steps default to `skip = TRUE` — they are applied **only**
+during `fit()`, never during `predict()`. This is the correct behaviour:
+you adjust the training distribution, not the test distribution.
+:::
+
+## General transformations: `step_mutate()`
+
+Mirrors `dplyr::mutate()` inside a recipe — useful for ratio features
+and other hand-crafted signals.
+
+```{r step-mutate-example}
+ratio_recipe <-
+  recipe(Sale_Price ~ ., data = ames_train) %>%
+  step_mutate(
+    bed_bath_ratio = Bedroom_AbvGr / (Full_Bath + Half_Bath + 0.01),
+    house_age = 2024 - Year_Built
+  )
+
+# Peek at new columns after baking
+ratio_recipe %>%
+  prep() %>%
+  bake(new_data = ames_train %>% slice(1:4)) %>%
+  select(bed_bath_ratio, house_age)
+```
+
+::: callout-warning
+## Leakage risk with `step_mutate()`
+
+Avoid statistics that depend on the full dataset inside `step_mutate()`.
+`x = w > mean(w)` uses `mean(w)` of **new** data at predict time — not
+the training mean. Use `step_normalize()` or manual constants instead.
+:::
+
+---
+
+# Skipping Steps for New Data (`skip = TRUE`)
+
+Some steps should only run during training — never on new/test data.
+
+```{r skip-demo}
+#| eval: false
+# WRONG — will fail at predict time because Sale_Price won't exist
+bad_recipe <-
+  recipe(Sale_Price ~ ., data = ames_train) %>%
+  step_log(Sale_Price, base = 10) # outcome transformation inside recipe
+
+# RIGHT — transform the outcome BEFORE building the recipe
+ames <- ames %>% mutate(Sale_Price = log10(Sale_Price))
+```
+
+Steps that automatically set `skip = TRUE`:
+
+-   `step_downsample()`, `step_upsample()`, `step_smote()`
+-   `step_filter()`, `step_sample()`, `step_slice()`, `step_naomit()`
+
+You can set `skip = TRUE` manually on any step when needed.
+
+---
+
+# Tidying a Recipe with `tidy()`
+
+## The full Ames recipe
+
+```{r full-ames-recipe}
+ames_rec <-
+  recipe(
+    Sale_Price ~ Neighborhood +
+      Gr_Liv_Area +
+      Year_Built +
+      Bldg_Type +
+      Latitude +
+      Longitude,
+    data = ames_train
+  ) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01, id = "nbhd_other") %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_")) %>%
+  step_ns(Latitude, Longitude, deg_free = 20)
+```
+
+## Inspect the step registry
+
+```{r tidy-recipe-untrained}
+tidy(ames_rec)
+```
+
+## Train and inspect learned parameters
+
+```{r fit-full-workflow}
+lm_wflow <-
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(ames_rec)
+
+lm_fit <- fit(lm_wflow, ames_train)
+
+estimated_rec <- extract_recipe(lm_fit, estimated = TRUE)
+```
+
+```{r tidy-by-id}
+# Which neighborhoods were retained (not pooled into 'other')?
+tidy(estimated_rec, id = "nbhd_other")
+```
+
+```{r tidy-by-number}
+# Same result using step number
+tidy(estimated_rec, number = 2)
+```
+
+```{r tidy-step-count}
+# How many retained neighborhoods?
+tidy(estimated_rec, id = "nbhd_other") %>%
+  count()
+```
+
+---
+
+# Column Roles
+
+Beyond `"predictor"` and `"outcome"`, you can assign **custom roles** to
+columns so they ride along during resampling without being used as model
+inputs.
+
+```{r column-roles-demo}
+#| eval: false
+# Suppose ames had an 'address' column we want to keep for audit purposes:
+ames_rec_with_id <-
+  ames_rec %>%
+  update_role(address, new_role = "street address")
+
+# A column can have multiple roles:
+ames_rec %>%
+  add_role(Neighborhood, new_role = "grouping variable")
+```
+
+This is especially valuable when **resampling** (Chapter 10) — keeping
+auxiliary columns in the same data frame avoids error-prone external
+vector joins.
+
+---
+
+# Putting It All Together: The Full Chapter 8 Pipeline
+
+This is the canonical code block from the end of Chapter 8 — the
+starting point for all subsequent chapters.
+
+```{r final-pipeline}
+library(tidymodels)
+data(ames)
+ames <- mutate(ames, Sale_Price = log10(Sale_Price))
+
+set.seed(502)
+ames_split <- initial_split(ames, prop = 0.80, strata = Sale_Price)
+ames_train <- training(ames_split)
+ames_test <- testing(ames_split)
+
+# ── Feature engineering recipe ────────────────────────────────────
+ames_rec <-
+  recipe(
+    Sale_Price ~ Neighborhood +
+      Gr_Liv_Area +
+      Year_Built +
+      Bldg_Type +
+      Latitude +
+      Longitude,
+    data = ames_train
+  ) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_")) %>%
+  step_ns(Latitude, Longitude, deg_free = 20)
+
+# ── Model + workflow ──────────────────────────────────────────────
+lm_model <- linear_reg() %>% set_engine("lm")
+
+lm_wflow <-
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(ames_rec)
+
+# ── Train ─────────────────────────────────────────────────────────
+lm_fit <- fit(lm_wflow, ames_train)
+
+# ── Test-set predictions ──────────────────────────────────────────
+test_preds <- predict(lm_fit, ames_test) %>%
+  bind_cols(ames_test %>% select(Sale_Price))
+
+# ── Evaluate ──────────────────────────────────────────────────────
+metrics(test_preds, truth = Sale_Price, estimate = .pred)
+```
+
+```{r pred-plot}
+#| fig-cap: "Predicted vs actual log₁₀ sale price on the test set"
+test_preds %>%
+  ggplot(aes(x = Sale_Price, y = .pred)) +
+  geom_abline(
+    slope = 1,
+    intercept = 0,
+    linetype = "dashed",
+    colour = "grey50"
+  ) +
+  geom_point(alpha = 0.3, size = 1.2, colour = "#3B7DD8") +
+  coord_obs_pred() +
+  labs(
+    x = "Observed log₁₀(Sale Price)",
+    y = "Predicted log₁₀(Sale Price)",
+    title = "Chapter 8 model — test set performance"
+  )
+```
+
+---
+
+# Exercises
+
+## Exercise 1 — Understanding `step_other()`
+
+Modify the threshold in `step_other(Neighborhood, threshold = ...)` to
+0.05 (5%) instead of 1%. Refit the workflow.
+
+a.  How many neighborhoods are now retained (not pooled into "other")?
+    Use `tidy()` to find out.
+b.  How does this change the number of predictor columns in the final
+    model? (Hint: use `extract_fit_parsnip() %>% tidy()` and count rows.)
+c.  Does test-set RMSE improve or worsen? What does this suggest about
+    the 1% threshold choice?
+
+```{r ex1-solution}
+#| code-fold: true
+#| code-summary: "Show solution"
+#| eval: false
+#| echo: false
+# Refit with 5% threshold
+ames_rec_5pct <-
+  recipe(
+    Sale_Price ~ Neighborhood +
+      Gr_Liv_Area +
+      Year_Built +
+      Bldg_Type +
+      Latitude +
+      Longitude,
+    data = ames_train
+  ) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.05, id = "nbhd_5pct") %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_")) %>%
+  step_ns(Latitude, Longitude, deg_free = 20)
+
+fit_5pct <- workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(ames_rec_5pct) %>%
+  fit(ames_train)
+
+# a) Retained neighborhoods
+tidy(extract_recipe(fit_5pct, estimated = TRUE), id = "nbhd_5pct") %>%
+  nrow() %>%
+  cat("Retained neighborhoods at 5% threshold:", ., "\n")
+
+# b) Number of model coefficients
+n_coef <- extract_fit_parsnip(fit_5pct) %>% tidy() %>% nrow()
+cat("Model coefficients:", n_coef, "\n")
+
+# c) RMSE comparison
+rmse_5pct <- predict(fit_5pct, ames_test) %>%
+  bind_cols(ames_test %>% select(Sale_Price)) %>%
+  rmse(truth = Sale_Price, estimate = .pred)
+
+rmse_1pct <- predict(lm_fit, ames_test) %>%
+  bind_cols(ames_test %>% select(Sale_Price)) %>%
+  rmse(truth = Sale_Price, estimate = .pred)
+
+bind_rows(
+  rmse_1pct %>% mutate(threshold = "1%"),
+  rmse_5pct %>% mutate(threshold = "5%")
+) %>%
+  select(threshold, .metric, .estimate)
+```
+
+---
+
+## Exercise 2 — Adding Normalization Before PCA
+
+The chapter mentions PCA requires predictors to be on the same scale.
+
+a.  Build a recipe that uses `step_normalize()` followed by `step_pca()`
+    on all `_SF` and `Gr_Liv` columns. Use `num_comp = 3`.
+b.  Use `prep() %>% bake(new_data = NULL)` to inspect the resulting
+    training data. What are the names of the PCA columns?
+c.  What percentage of variance is explained by each component? Use
+    `tidy(prepped_recipe, number = <pca_step_number>)` with
+    `type = "variance"`.
+
+```{r ex2-solution}
+#| code-fold: true
+#| code-summary: "Show solution"
+#| eval: false
+#| echo: false
+pca_rec <-
+  recipe(
+    Sale_Price ~ Neighborhood +
+      Gr_Liv_Area +
+      Year_Built +
+      Bldg_Type +
+      Total_Bsmt_SF +
+      First_Flr_SF,
+    data = ames_train
+  ) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01) %>%
+  step_normalize(matches("(SF$)|(Gr_Liv)"), id = "norm_step") %>%
+  step_pca(matches("(SF$)|(Gr_Liv)"), num_comp = 3, id = "pca_step") %>%
+  step_dummy(all_nominal_predictors())
+
+prepped_pca <- prep(pca_rec)
+
+# b) PCA column names
+bake(prepped_pca, new_data = NULL) %>%
+  select(starts_with("PC")) %>%
+  names()
+
+# c) Variance explained
+tidy(prepped_pca, id = "pca_step", type = "variance") %>%
+  filter(terms == "percent variance") %>%
+  select(component, value)
+```
+
+---
+
+## Exercise 3 — Spline Degrees of Freedom Comparison
+
+The chapter warns that too few spline terms underfit while too many
+overfit.
+
+a.  Fit three separate workflows using `step_ns(Latitude, deg_free = d)`
+    for `d` in `c(5, 20, 50)`.
+b.  For each, compute RMSE on the **test set**.
+c.  Plot predicted vs. actual for each. Which degrees of freedom gives
+    the best test-set performance?
+d.  Why shouldn't you select `deg_free` purely based on test-set RMSE?
+    What should you use instead? (Hint: Chapter 10.)
+
+```{r ex3-solution}
+#| code-fold: true
+#| code-summary: "Show solution"
+#| eval: false
+#| echo: false
+make_spline_wflow <- function(df) {
+  rec <- recipe(
+    Sale_Price ~ Neighborhood +
+      Gr_Liv_Area +
+      Year_Built +
+      Bldg_Type +
+      Latitude +
+      Longitude,
+    data = ames_train
+  ) %>%
+    step_log(Gr_Liv_Area, base = 10) %>%
+    step_other(Neighborhood, threshold = 0.01) %>%
+    step_dummy(all_nominal_predictors()) %>%
+    step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_")) %>%
+    step_ns(Latitude, Longitude, deg_free = df)
+
+  workflow() %>% add_model(lm_model) %>% add_recipe(rec)
+}
+
+dfs <- c(5, 20, 50)
+spline_results <- purrr::map_dfr(dfs, function(df) {
+  wf <- make_spline_wflow(df)
+  fit <- fit(wf, ames_train)
+  predict(fit, ames_test) %>%
+    bind_cols(ames_test %>% select(Sale_Price)) %>%
+    rmse(truth = Sale_Price, estimate = .pred) %>%
+    mutate(deg_free = df)
+})
+
+spline_results %>%
+  select(deg_free, .metric, .estimate) %>%
+  arrange(.estimate)
+```
+
+---
+
+## Exercise 4 — Marketing Dataset Application
+
+> **Context:** You are working on a customer churn prediction model for a
+> telecommunications company. The dataset contains:
+>
+> -   `Churn` — binary outcome (Yes/No)
+> -   `MonthlyCharges` — continuous, right-skewed
+> -   `TotalCharges` — continuous, right-skewed, has some `NA` values
+> -   `Contract` — factor (Month-to-month, One year, Two year)
+> -   `InternetService` — factor (DSL, Fiber optic, No)
+> -   `tenure` — numeric (months with company)
+> -   `CustomerID` — identifier column (should not be a predictor)
+
+Build a recipe that:
+
+a.  Assigns `CustomerID` the role `"id"` using `update_role()` so it
+    rides along without being used in the model.
+b.  Applies `step_log(MonthlyCharges, TotalCharges, base = 10)` for
+    skew correction.
+c.  Imputes missing `TotalCharges` with the median via
+    `step_impute_median()`.
+d.  Creates an interaction between `MonthlyCharges` and each
+    `Contract` dummy.
+e.  Pools any `InternetService` level with fewer than 5% of rows into
+    "other".
+f.  Prints the recipe and explains in a comment what each step does and
+    why it is placed in that order.
+
+```{r ex4-solution}
+#| code-fold: true
+#| code-summary: "Show solution"
+#| eval: false
+#| echo: false
+# Simulate a small telco dataset for illustration
+set.seed(42)
+n <- 500
+telco_train <- tibble(
+  CustomerID = paste0("C", seq_len(n)),
+  Churn = factor(sample(
+    c("Yes", "No"),
+    n,
+    replace = TRUE,
+    prob = c(0.27, 0.73)
+  )),
+  MonthlyCharges = rgamma(n, shape = 3, rate = 0.04),
+  TotalCharges = ifelse(runif(n) < 0.03, NA, rgamma(n, shape = 5, rate = 0.01)),
+  Contract = factor(sample(
+    c("Month-to-month", "One year", "Two year"),
+    n,
+    replace = TRUE,
+    prob = c(0.55, 0.25, 0.20)
+  )),
+  InternetService = factor(sample(
+    c("DSL", "Fiber optic", "No"),
+    n,
+    replace = TRUE,
+    prob = c(0.34, 0.44, 0.22)
+  )),
+  tenure = rpois(n, lambda = 32)
+)
+
+telco_recipe <-
+  recipe(
+    Churn ~ MonthlyCharges +
+      TotalCharges +
+      Contract +
+      InternetService +
+      tenure +
+      CustomerID,
+    data = telco_train
+  ) %>%
+  # Step 0: remove CustomerID from modelling (keep it as an ID column)
+  update_role(CustomerID, new_role = "id") %>%
+  # Step 1: impute before transforming — log(0) or log(NA) would fail
+  step_impute_median(TotalCharges) %>%
+  # Step 2: log-transform right-skewed continuous predictors
+  step_log(MonthlyCharges, TotalCharges, base = 10) %>%
+  # Step 3: pool rare InternetService levels (if any fall below 5%)
+  step_other(InternetService, threshold = 0.05) %>%
+  # Step 4: create dummy variables (must precede step_interact)
+  step_dummy(all_nominal_predictors()) %>%
+  # Step 5: interaction — monthly charges × contract type dummies
+  step_interact(~ MonthlyCharges:starts_with("Contract_"))
+
+telco_recipe
+```
+
+---
+
+## Exercise 5 — Debug a Broken Recipe
+
+The following recipe has **three deliberate mistakes**. Identify each
+mistake, explain why it is wrong, and provide a corrected version.
+
+```{r ex5-broken}
+#| eval: false
+broken_recipe <-
+  recipe(
+    Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+    data = ames_train
+  ) %>%
+  # Mistake 1
+  step_log(Sale_Price, base = 10) %>%
+  # Mistake 2
+  step_interact(~ Gr_Liv_Area:Bldg_Type) %>%
+  # Mistake 3
+  step_dummy(all_nominal_predictors()) %>%
+  step_other(Neighborhood, threshold = 0.01)
+```
+
+```{r ex5-solution}
+#| code-fold: true
+#| code-summary: "Show solution"
+#| echo: false
+# Mistake 1: step_log(Sale_Price) — transforming the outcome inside the recipe.
+#   This will fail at predict() time because Sale_Price won't exist in new data.
+#   Fix: transform Sale_Price in the data frame BEFORE creating the recipe.
+
+# Mistake 2: step_interact(~ Gr_Liv_Area:Bldg_Type) — using a raw factor column
+#   in step_interact() before step_dummy() has run. The factor hasn't been encoded
+#   yet, which produces unexpected/wrong interaction columns.
+#   Fix: move step_interact() AFTER step_dummy().
+
+# Mistake 3: step_dummy() before step_other() — rare Neighborhood levels get
+#   their own dummy columns before being pooled. This means the "other" pool
+#   is formed from already-dummy-encoded data, which is wrong.
+#   Fix: step_other() must come BEFORE step_dummy().
+
+corrected_recipe <-
+  recipe(
+    Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+    data = ames_train
+  ) %>%
+  step_log(Gr_Liv_Area, base = 10) %>% # fix 1: log the predictor, not outcome
+  step_other(Neighborhood, threshold = 0.01) %>% # fix 3: pool BEFORE dummies
+  step_dummy(all_nominal_predictors()) %>% # fix 3: dummies after pooling
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_")) # fix 2: interact AFTER dummies
+
+corrected_recipe
+```
+
+---
+
+# Chapter 8 — Key Takeaways
+
+| Concept | What to remember |
+|-------------------------------|--------------------------------------|
+| `recipe()` | Specifies steps; estimation deferred to `fit()` |
+| `step_other()` | Pool rare factor levels **before** `step_dummy()` |
+| `step_dummy()` | Converts factors to binary columns; use `one_hot = TRUE` if needed |
+| `step_interact()` | Must run **after** `step_dummy()` |
+| `step_ns()` | Spline expansion; `deg_free` is a tuning parameter |
+| `step_pca()` | Compress correlated columns; normalize first |
+| `step_mutate()` | Flexible hand-crafted features; watch for leakage |
+| `skip = TRUE` | Subsampling steps only affect training data |
+| `tidy()` | Inspect what the recipe learned from training data |
+| `update_role()` | Keep ID/audit columns without using them as predictors |
+
+```{r session-info}
+#| code-fold: true
+#| code-summary: "Session info"
+# install.packages("sessioninfo")
+sessioninfo::session_info()
+```
