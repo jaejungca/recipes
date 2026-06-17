@@ -14,6 +14,7 @@ format:
     highlight-style: github
     df-print: paged
     embed-resources: true
+    output-dir: docs
 execute:
   warning: false
   message: false
@@ -93,7 +94,7 @@ mail_data <- tibble(
   )
 ) |>
   mutate(
-    income = if_else(runif(n) < 0.08, NA_real_, income), 
+    income = if_else(runif(n) < 0.08, NA_real_, income),
     avg_order_amt = if_else(runif(n) < 0.05, NA_real_, avg_order_amt),
     responded = factor(responded, levels = c(1, 0), labels = c("yes", "no"))
   )
@@ -120,60 +121,130 @@ library(patchwork)
 set.seed(42)
 n <- 5000
 meanlog <- 10.8
-sdlog   <- 0.6
+sdlog <- 0.6
 
-income     <- rlnorm(n, meanlog = meanlog, sdlog = sdlog)
+income <- rlnorm(n, meanlog = meanlog, sdlog = sdlog)
 log_income <- log(income)
 
-median_raw  <- exp(meanlog)
-mean_raw    <- exp(meanlog + sdlog^2 / 2)
-gsd_low     <- median_raw / exp(sdlog)
-gsd_high    <- median_raw * exp(sdlog)
-log_median  <- meanlog
-log_mean    <- meanlog + sdlog^2 / 2
-log_sd_low  <- meanlog - sdlog
+median_raw <- exp(meanlog)
+mean_raw <- exp(meanlog + sdlog^2 / 2)
+gsd_low <- median_raw / exp(sdlog)
+gsd_high <- median_raw * exp(sdlog)
+log_median <- meanlog
+log_mean <- meanlog + sdlog^2 / 2
+log_sd_low <- meanlog - sdlog
 log_sd_high <- meanlog + sdlog
 
 df_raw <- tibble(income = income) |> filter(income < 250000)
 df_log <- tibble(log_income = log_income)
 
 p1 <- ggplot(df_raw, aes(x = income)) +
-  annotate("rect",
-    xmin = gsd_low, xmax = gsd_high, ymin = -Inf, ymax = Inf,
-    fill = "#97C459", alpha = 0.15) +
-  geom_histogram(bins = 50, fill = "#85B7EB", color = "#378ADD", linewidth = 0.3) +
+  annotate(
+    "rect",
+    xmin = gsd_low,
+    xmax = gsd_high,
+    ymin = -Inf,
+    ymax = Inf,
+    fill = "#97C459",
+    alpha = 0.15
+  ) +
+  geom_histogram(
+    bins = 50,
+    fill = "#85B7EB",
+    color = "#378ADD",
+    linewidth = 0.3
+  ) +
   geom_vline(aes(xintercept = median_raw, color = "Median"), linewidth = 1) +
-  geom_vline(aes(xintercept = mean_raw,   color = "Mean"),   linewidth = 1, linetype = "dashed") +
-  annotate("text", x = median_raw - 1500, y = Inf,
-    label = "median\n$49K", color = "#E24B4A", vjust = 1.3, hjust = 1, size = 3) +
-  annotate("text", x = mean_raw + 1500, y = Inf,
-    label = "mean\n$59K",   color = "#BA7517", vjust = 1.3, hjust = 0, size = 3) +
+  geom_vline(
+    aes(xintercept = mean_raw, color = "Mean"),
+    linewidth = 1,
+    linetype = "dashed"
+  ) +
+  annotate(
+    "text",
+    x = median_raw - 1500,
+    y = Inf,
+    label = "median\n$49K",
+    color = "#E24B4A",
+    vjust = 1.3,
+    hjust = 1,
+    size = 3
+  ) +
+  annotate(
+    "text",
+    x = mean_raw + 1500,
+    y = Inf,
+    label = "mean\n$59K",
+    color = "#BA7517",
+    vjust = 1.3,
+    hjust = 0,
+    size = 3
+  ) +
   scale_color_manual(values = c("Median" = "#E24B4A", "Mean" = "#BA7517")) +
-  scale_x_continuous(labels = scales::dollar_format(scale = 1e-3, suffix = "K")) +
-  labs(x = "Income ($)", y = "Count",
-       title = "Income (original scale)") +
+  scale_x_continuous(
+    labels = scales::dollar_format(scale = 1e-3, suffix = "K")
+  ) +
+  labs(x = "Income ($)", y = "Count", title = "Income (original scale)") +
   theme_minimal(base_size = 12) +
-  theme(legend.position = "none",
-        plot.title = element_text(size = 11, face = "bold", color = "gray40"))
+  theme(
+    legend.position = "none",
+    plot.title = element_text(size = 11, face = "bold", color = "gray40")
+  )
 
 p2 <- ggplot(df_log, aes(x = log_income)) +
-  annotate("rect",
-    xmin = log_sd_low, xmax = log_sd_high, ymin = -Inf, ymax = Inf,
-    fill = "#97C459", alpha = 0.15) +
-  geom_histogram(bins = 40, fill = "#85B7EB", color = "#378ADD", linewidth = 0.3) +
+  annotate(
+    "rect",
+    xmin = log_sd_low,
+    xmax = log_sd_high,
+    ymin = -Inf,
+    ymax = Inf,
+    fill = "#97C459",
+    alpha = 0.15
+  ) +
+  geom_histogram(
+    bins = 40,
+    fill = "#85B7EB",
+    color = "#378ADD",
+    linewidth = 0.3
+  ) +
   geom_vline(aes(xintercept = log_median, color = "Median"), linewidth = 1) +
-  geom_vline(aes(xintercept = log_mean,   color = "Mean"),   linewidth = 1, linetype = "dashed") +
-  annotate("text", x = log_median - 0.03, y = Inf,
-    label = "median\n10.8",  color = "#E24B4A", vjust = 1.3, hjust = 1, size = 3) +
-  annotate("text", x = log_mean + 0.03, y = Inf,
-    label = "mean\n10.98",   color = "#BA7517", vjust = 1.3, hjust = 0, size = 3) +
+  geom_vline(
+    aes(xintercept = log_mean, color = "Mean"),
+    linewidth = 1,
+    linetype = "dashed"
+  ) +
+  annotate(
+    "text",
+    x = log_median - 0.03,
+    y = Inf,
+    label = "median\n10.8",
+    color = "#E24B4A",
+    vjust = 1.3,
+    hjust = 1,
+    size = 3
+  ) +
+  annotate(
+    "text",
+    x = log_mean + 0.03,
+    y = Inf,
+    label = "mean\n10.98",
+    color = "#BA7517",
+    vjust = 1.3,
+    hjust = 0,
+    size = 3
+  ) +
   scale_color_manual(values = c("Median" = "#E24B4A", "Mean" = "#BA7517")) +
   scale_x_continuous(breaks = seq(8, 14, by = 0.5)) +
-  labs(x = "log(income)", y = "Count",
-       title = "log(income) — transformed scale") +
+  labs(
+    x = "log(income)",
+    y = "Count",
+    title = "log(income) — transformed scale"
+  ) +
   theme_minimal(base_size = 12) +
-  theme(legend.position = "none",
-        plot.title = element_text(size = 11, face = "bold", color = "gray40"))
+  theme(
+    legend.position = "none",
+    plot.title = element_text(size = 11, face = "bold", color = "gray40")
+  )
 
 p1 / p2
 ```
