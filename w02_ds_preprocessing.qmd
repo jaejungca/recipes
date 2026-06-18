@@ -10,6 +10,7 @@ format:
     toc-expand: 1
     toc-location: right-body
     toc-title: "Contents"
+    number-sections: true
     code-fold: show
     code-tools: true
     theme: cosmo
@@ -36,7 +37,7 @@ By the end of this notebook you will be able to:
 
 ------------------------------------------------------------------------
 
-# 1 Setup
+# Setup
 
 ```{r setup}
 library(tidymodels) # umbrella: rsample, recipes, parsnip, workflows, yardstick
@@ -50,7 +51,7 @@ set.seed(2024)
 
 ------------------------------------------------------------------------
 
-# 2 The Marketing Dataset
+# The Marketing Dataset
 
 We use a synthetic **direct-mail** dataset that mirrors a real acquisition campaign. Each row is one prospect; the outcome is whether they **responded** (bought).
 
@@ -112,6 +113,8 @@ skim(mail_data)
 ::: callout-note
 **Marketing context.** Notice that `income` and `avg_order_amt` are right-skewed (typical for financial variables) and contain missing values — two very common real-world preprocessing challenges.
 :::
+
+## Explaining how Income distribution changes from normal to logged data
 
 ```{r}
 #| fig-height: 7
@@ -267,15 +270,15 @@ This means a typical income is within a factor of 1.82 above or below the median
 
 ------------------------------------------------------------------------
 
-# 3 Data Splitting
+# Data Splitting
 
-## 3.1 Why We Split
+## Why We Split
 
 The test set simulates **unseen future customers**. Any transformation parameter (mean, standard deviation, imputation value) estimated on the full dataset "leaks" information about the test set into the model — this is called **data leakage** and leads to overly optimistic performance estimates.
 
 The golden rule: **fit everything on training data, apply to test data**.
 
-## 3.2 Stratified Random Split
+## Stratified Random Split
 
 ```{r split}
 mail_data |>
@@ -310,7 +313,7 @@ bind_rows(
 **Marketing note.** Direct-mail response rates are typically 1–5 %. Stratification ensures the rare "yes" class is represented in both sets. Without it, a small test set might have almost no responders by chance.
 :::
 
-## 3.3 ✏️ Exercise 3.1
+## ✏️ Exercise 3.1
 
 Change `prop` to `0.70` and re-run the split. How many records move from training to test? How does the response rate change?
 
@@ -321,11 +324,11 @@ Change `prop` to `0.70` and re-run the split. How many records move from trainin
 
 ------------------------------------------------------------------------
 
-# 4 Building a Recipe
+# Building a Recipe
 
 A `recipe` is a **reusable preprocessing script** tied to a specific formula and training dataset. Steps are declared with `step_*()` functions; nothing is computed until you call `prep()`.
 
-## 4.1 Step-by-Step Construction
+## Step-by-Step Construction
 
 ```{r recipe-build}
 mail_rec <- recipe(responded ~ ., data = mail_train) |>
@@ -357,9 +360,9 @@ mail_rec
 summary(mail_rec) # variable roles
 ```
 
-## 4.2 Deep Dive: Each Step
+## Deep Dive: Each Step
 
-### 4.2.1 Imputation (`step_impute_median`)
+### Imputation (`step_impute_median`)
 
 ```{r imputation-demo}
 # How much is missing?
@@ -377,7 +380,7 @@ mail_train |>
 **Why median and not mean?** The median is robust to the same right-skew that makes these variables candidates for log transformation. Using the mean on a skewed distribution would impute an "average" that may not represent the typical customer.
 :::
 
-### 4.2.2 Log Transformation (`step_log`)
+### Log Transformation (`step_log`)
 
 ```{r log-demo}
 # Visual: income before and after log10
@@ -397,7 +400,7 @@ library(patchwork)
 p1 + p2
 ```
 
-### 4.2.3 Normalization (`step_normalize`)
+### Normalization (`step_normalize`)
 
 Centering and scaling puts all numeric variables on the same unit-free scale. This is *required* for distance-based models (KNN, SVM) and strongly recommended for logistic regression with regularization.
 
@@ -416,7 +419,7 @@ prep(rec_partial) |>
   summary()
 ```
 
-### 4.2.4 Dummy Variables (`step_dummy`)
+### Dummy Variables (`step_dummy`)
 
 ```{r dummy-demo}
 # Inspect how many dummies will be created
@@ -433,7 +436,7 @@ mail_train |>
 
 ------------------------------------------------------------------------
 
-# 5 Preparing and Baking
+# Preparing and Baking
 
 `prep()` **estimates** all statistics from the training data. `bake()` **applies** those statistics to any dataset.
 
@@ -457,7 +460,7 @@ glimpse(test_baked)
 
 ------------------------------------------------------------------------
 
-# 6 Connecting the Recipe to a Model Workflow
+# Connecting the Recipe to a Model Workflow
 
 In `tidymodels`, a `workflow` bundles the recipe + model so both are fitted and applied together — no chance of forgetting preprocessing.
 
@@ -479,7 +482,7 @@ mail_wf
 
 ::: {.callout-note title="Regularization: Ridge, Lasso, and Elastic Net"}
 
-## Why Regularization?
+## Why Regularization?{.unnumbered}
 
 Ordinary logistic regression finds coefficients that best fit the training data. 
 But with many predictors — common in marketing datasets with demographics, 
@@ -502,9 +505,9 @@ The $\lambda$ (`penalty`) parameter controls how hard we squeeze the coefficient
 
 ---
 
-## Three Flavors of Regularization
+## Three Flavors of Regularization{.unnumbered}
 
-### Ridge (L2)
+### Ridge (L2) {.unnumbered}
 
 Ridge adds the **sum of squared coefficients** as the penalty:
 
@@ -517,7 +520,7 @@ magnitude without discarding any.
 
 In `tidymodels`: `mixture = 0`
 
-### Lasso (L1)
+### Lasso (L1) {.unnumbered}
 
 Lasso adds the **sum of absolute coefficients** as the penalty:
 
@@ -531,7 +534,7 @@ and want the model to tell you which ones actually drive response.
 
 In `tidymodels`: `mixture = 1`
 
-### Elastic Net
+### Elastic Net {.unnumbered}
 
 Elastic net **blends Ridge and Lasso**:
 
@@ -554,7 +557,7 @@ In `tidymodels`: `0 < mixture < 1`
 
 ---
 
-## Choosing $\lambda$
+## Choosing $\lambda$ {.unnumbered}
 
 The `penalty` value ($\lambda$) is a **hyperparameter** — it is not learned from 
 the data during model fitting. Instead, it must be chosen beforehand or tuned using cross-validation. A common workflow in `tidymodels` is to replace the fixed value with `tune()` and search over a grid of candidates:
@@ -570,7 +573,7 @@ course we will tune this properly.
 
 ---
 
-## Quick Reference
+## Quick Reference {.unnumbered}
 
 | Method       | Penalty type      | Zeroes out predictors? | Best when...                          |
 |--------------|-------------------|------------------------|---------------------------------------|
@@ -601,7 +604,7 @@ preds |>
 
 ------------------------------------------------------------------------
 
-# 7 Inspecting and Debugging a Recipe
+# Inspecting and Debugging a Recipe
 
 ```{r tidy-recipe}
 # See what each step will do / has done (after prep)
@@ -620,7 +623,7 @@ tidy(mail_prep, number = 1)
 
 ------------------------------------------------------------------------
 
-# 8 Exercises
+# Exercises
 
 ## ✏️ Exercise 8.1 — Alternative Imputation
 
@@ -670,7 +673,7 @@ The split used `strata = responded`. Remove stratification and re-split five tim
 
 ------------------------------------------------------------------------
 
-# 9 Summary
+# Summary
 
 | Concept               | Function               | Key Argument               |
 |-----------------------|------------------------|----------------------------|
