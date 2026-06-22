@@ -1,0 +1,470 @@
+---
+title: "Data Splitting & Preprocessing with recipes"
+subtitle: "A map before we open the codebook"
+author: "Jae Jung · IBM 6540"
+date: today
+format:
+  revealjs:
+    theme: [default, week02_custom.scss]
+    highlight-style: dracula # readable against dark background
+    slide-number: c/t
+    toc: true
+    toc-depth: 1
+    progress: true
+    transition: fade
+    transition-speed: fast
+    code-line-numbers: false
+    code-fold: false
+    code-tools: false
+    embed-resources: true
+    fig-align: center
+    chalkboard: false
+    preview-links: auto
+    width: 1280
+    height: 720
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+## Before We Open the Codebook{.unnumbered}
+
+<div class="card-rule"></div>
+
+::: {.fragment .fade-in}
+Today's notebook is long. This is the **map**, not the territory.
+:::
+
+::: {.fragment .fade-in}
+Five stops: the data, the split, the recipe, the model, the inspection.
+:::
+
+::: {.fragment .fade-in .accent-box}
+Hold onto the big ideas — the syntax will make more sense once you see *why* each step exists.
+:::
+
+::: {.notes}
+Set expectations: this deck is short on purpose. The codebook has the full depth; this is orientation so students aren't lost in syntax before they understand the shape of the problem.
+:::
+
+---
+
+## Today's Five Stops{.unnumbered}
+
+<div class="card-rule"></div>
+
+::: {.incremental}
+1. **The dataset** — a direct-mail marketing campaign
+2. **The split** — why we set data aside before touching it
+3. **The recipe** — a reusable preprocessing pipeline
+4. **The workflow** — bundling recipe + model so nothing gets forgotten
+5. **Inspecting** — `prep()`, `bake()`, and reading what the recipe learned
+:::
+
+---
+
+# Stop 1 — The Dataset {background-color="#FAF6EE"}
+
+::: {.divider-subtitle}
+A direct-mail campaign, simulated
+:::
+
+---
+
+## Meet the Prospects{.unnumbered}
+
+<div class="card-rule"></div>
+
+::: {.fragment .fade-in}
+3,000 simulated customers. One question: **will they respond** to a mailing?
+:::
+
+::: {.fragment .fade-in}
+<div class="ingredient-card">
+<div class="ing-row"><span class="ing-name">age, income</span><span class="ing-note">demographics</span></div>
+<div class="ing-row"><span class="ing-name">recency_days, freq_12mo</span><span class="ing-note">behavior — RFM style</span></div>
+<div class="ing-row"><span class="ing-name">channel, region, loyalty_tier</span><span class="ing-note">categorical context</span></div>
+<div class="ing-row highlight"><span class="ing-name">responded</span><span class="ing-note">yes / no — what we predict</span></div>
+</div>
+:::
+
+---
+
+## Two Problems, Hiding in Plain Sight{.unnumbered}
+
+<div class="card-rule"></div>
+
+:::: {.columns}
+
+::: {.column width="48%"}
+### Right-skewed variables
+`income` and `avg_order_amt` — a few big spenders pull the tail out long.
+:::
+
+::: {.column width="4%"}
+:::
+
+::: {.column width="48%"}
+### Missing values
+~8% of `income`, ~5% of `avg_order_amt` are `NA` — realistic, not a bug.
+:::
+
+::::
+
+::: {.fragment .accent-box}
+Both are completely ordinary in marketing data. Both need to be handled **before** modeling — that's the whole point of today.
+:::
+
+---
+
+## Why Log Income?{.unnumbered}
+
+<div class="card-rule"></div>
+
+::: {.fragment .fade-in}
+Median income ≈ **\$49K**. Mean income ≈ **\$59K**. They disagree because of the long right tail.
+:::
+
+::: {.fragment .fade-in}
+<div class="ingredient-card">
+<div class="ing-row"><span class="ing-name">Raw scale</span><span class="ing-note">long tail, hard for models to weight fairly</span></div>
+<div class="ing-row highlight"><span class="ing-name">log(income)</span><span class="ing-note">roughly symmetric, easier to model</span></div>
+</div>
+:::
+
+::: {.fragment}
+We'll see the before/after histograms live in the codebook — this is *why* `step_log()` exists.
+:::
+
+---
+
+# Stop 2 — The Split {background-color="#FAF6EE"}
+
+::: {.divider-subtitle}
+Setting data aside before we touch anything
+:::
+
+---
+
+## The Golden Rule{.unnumbered}
+
+<div class="card-rule"></div>
+
+::: {.r-fit-text}
+Fit everything on training data.
+:::
+
+::: {.r-fit-text .accent}
+Apply it to test data.
+:::
+
+::: {.fragment}
+Never the reverse — that's **data leakage**, and it makes performance look better than it really is.
+:::
+
+---
+
+## Why the Test Set Exists{.unnumbered}
+
+<div class="card-rule"></div>
+
+::: {.fragment .fade-in}
+The test set stands in for **future prospects** the model hasn't met yet.
+:::
+
+::: {.fragment .fade-in}
+Any number we compute from the *full* dataset — a mean, a median, an imputed value — quietly leaks test-set information into training.
+:::
+
+::: {.fragment .fade-in .accent-box}
+That leak is invisible in your code, but it shows up later as a model that performs worse in the real world than it did in your notebook.
+:::
+
+---
+
+## Stratified Splitting{.unnumbered}
+
+<div class="card-rule"></div>
+
+```{.r}
+initial_split(mail_data, prop = 0.80, strata = responded)
+```
+
+::: {.fragment}
+<div class="ingredient-card">
+<div class="ing-row"><span class="ing-name">80% training</span><span class="ing-note">recipe + model learn here</span></div>
+<div class="ing-row highlight"><span class="ing-name">20% test</span><span class="ing-note">touched once, at the very end</span></div>
+</div>
+:::
+
+::: {.fragment .accent-box}
+Direct-mail response rates run 1–5%. Without `strata = responded`, a small test set could end up with almost no responders by chance.
+:::
+
+---
+
+# Stop 3 — The Recipe {background-color="#FAF6EE"}
+
+::: {.divider-subtitle}
+A reusable preprocessing pipeline
+:::
+---
+
+## Why "Recipe"?{.unnumbered}
+
+<div class="card-rule"></div>
+
+::: {.fragment .fade-in}
+A recipe is a **written plan** for transforming raw ingredients into something usable — before any cooking happens.
+:::
+
+::: {.fragment .fade-in}
+```{.r}
+recipe(responded ~ ., data = mail_train) |>
+  step_impute_median(...) |>
+  step_log(...) |>
+  step_normalize(...) |>
+  step_dummy(...) |>
+  step_zv(...)
+```
+:::
+
+::: {.fragment .accent-box}
+Nothing is computed yet — `step_*()` calls just **declare** the plan. That's the whole idea.
+:::
+
+---
+
+## Six Steps, One Pipeline{.unnumbered}
+
+<div class="card-rule"></div>
+
+<div class="recipe-steps">
+<div class="step"><span class="num">1</span><span class="step-name">Set role</span><span class="step-desc">customer_id is an ID, not a predictor</span></div>
+<div class="step"><span class="num">2</span><span class="step-name">Impute</span><span class="step-desc">fill missing income / avg_order_amt with the median</span></div>
+<div class="step"><span class="num">3</span><span class="step-name">Log transform</span><span class="step-desc">tame right-skewed dollar variables</span></div>
+<div class="step"><span class="num">4</span><span class="step-name">Normalize</span><span class="step-desc">center + scale every numeric predictor</span></div>
+<div class="step"><span class="num">5</span><span class="step-name">Dummy encode</span><span class="step-desc">turn categories into 0/1 columns</span></div>
+<div class="step"><span class="num">6</span><span class="step-name">Zero-variance filter</span><span class="step-desc">safety net — drop predictors with no signal</span></div>
+</div>
+
+---
+
+## Step 2 — Impute: Median, Not Mean{.unnumbered}
+
+<div class="card-rule"></div>
+
+```{.r}
+step_impute_median(all_numeric_predictors())
+```
+
+::: {.fragment .accent-box}
+The same right-skew that makes us log-transform `income` is *why* the median beats the mean here — the mean gets dragged toward outliers, the median doesn't.
+:::
+
+---
+
+## Step 3 — Log Transform{.unnumbered}
+
+<div class="card-rule"></div>
+
+```{.r}
+step_log(income, avg_order_amt, recency_days, 
+         base = 10, offset = 1)
+```
+
+::: {.fragment}
+`offset = 1` exists for one reason: <code>log(0)</code> is undefined. Adding 1 first sidesteps that.
+:::
+
+---
+
+## Step 4 — Normalize{.unnumbered}
+
+<div class="card-rule"></div>
+
+```{.r}
+step_normalize(all_numeric_predictors())
+```
+
+::: {.fragment .fade-in}
+Centers and scales every numeric column to the same unit-free range.
+:::
+
+::: {.fragment .fade-in .accent-box}
+Required for distance-based models (KNN, SVM). Strongly recommended for **regularized** logistic regression — coming up next.
+:::
+
+---
+
+## Step 5 — Dummy Encode{.unnumbered}
+
+<div class="card-rule"></div>
+
+```{.r}
+step_dummy(all_nominal_predictors())
+```
+
+::: {.fragment}
+`channel`, `region`, `loyalty_tier` become 0/1 columns — *k − 1* per factor, to avoid redundancy between columns.
+:::
+
+---
+
+## The Golden Rule, Applied to Recipes{.unnumbered}
+
+<div class="card-rule"></div>
+
+```{.r}
+mail_prep <- prep(mail_rec)              # learn from training
+train_baked <- bake(mail_prep, new_data = NULL)
+test_baked  <- bake(mail_prep, new_data = mail_test)
+```
+
+::: {.fragment .accent-box}
+**`prep()` learns** the medians, means, and factor levels — once, from training data. **`bake()` applies** those learned values anywhere, including to the test set.
+:::
+
+::: {.fragment}
+Re-running `prep()` on the test set separately would re-estimate everything from test data — exactly the leakage we just spent two slides avoiding.
+:::
+
+---
+
+# Stop 4 — The Workflow {background-color="#FAF6EE"}
+
+::: {.divider-subtitle}
+Bundling recipe + model
+:::
+
+---
+
+## Why Bundle Them?{.unnumbered}
+
+<div class="card-rule"></div>
+
+::: {.fragment .fade-in}
+A `workflow()` pairs a recipe with a model spec so they're **always fit and applied together**.
+:::
+
+::: {.fragment .fade-in .accent-box}
+No chance of forgetting to preprocess new data the same way you preprocessed training data.
+:::
+
+```{.r}
+workflow() |>
+  add_recipe(mail_rec) |>
+  add_model(lr_spec)
+```
+
+---
+
+## A Quick Word on Regularization{.unnumbered}
+
+<div class="card-rule"></div>
+
+::: {.fragment .fade-in}
+With many predictors, ordinary logistic regression can **overfit** — memorizing noise instead of signal.
+:::
+
+::: {.fragment .fade-in}
+Regularization adds a penalty that discourages large coefficients, forcing a simpler, more generalizable model.
+:::
+
+::: {.fragment}
+<div class="ingredient-card">
+<div class="ing-row"><span class="ing-name">Ridge</span><span class="ing-note">shrinks all coefficients, keeps every predictor</span></div>
+<div class="ing-row highlight"><span class="ing-name">Lasso</span><span class="ing-note">can zero out predictors — built-in selection</span></div>
+<div class="ing-row"><span class="ing-name">Elastic Net</span><span class="ing-note">blends both, often the safe default</span></div>
+</div>
+:::
+
+::: {.notes}
+Full mathematical detail (the penalty formulas, mixture parameter table) lives in the codebook callout — this slide is just enough for students to recognize the three names and roughly what each does before they see the equations.
+:::
+
+---
+
+## Today We Fix the Knobs{.unnumbered}
+
+<div class="card-rule"></div>
+
+```{.r}
+logistic_reg(penalty = 0.01, mixture = 1) |>  # Lasso
+  set_engine("glmnet") |>
+  set_mode("classification")
+```
+
+::: {.fragment .accent-box}
+`mixture = 1` → pure Lasso. `penalty = 0.01` is a reasonable starting value — later in the course we'll **tune** it properly with `tune()` and cross-validation.
+:::
+
+---
+
+# Stop 5 — Inspecting the Recipe {background-color="#FAF6EE"}
+
+::: {.divider-subtitle}
+Reading what the recipe learned
+:::
+
+---
+
+## Don't Just Trust It — Look Inside{.unnumbered}
+
+<div class="card-rule"></div>
+
+```{.r}
+tidy(mail_prep)                    # what did each step do?
+tidy(mail_prep, number = 3)        # zoom into one step
+```
+
+::: {.fragment .accent-box}
+Every `prep()`-ed recipe can be inspected. If a model behaves strangely later, this is where you check whether preprocessing did what you expected.
+:::
+
+---
+
+## What You'll Actually Type Today{.unnumbered}
+
+<div class="card-rule"></div>
+
+<div class="recipe-steps compact">
+<div class="step"><span class="num">1</span><span class="step-name">initial_split()</span><span class="step-desc">split, stratified by response</span></div>
+<div class="step"><span class="num">2</span><span class="step-name">recipe() + step_*()</span><span class="step-desc">declare the preprocessing plan</span></div>
+<div class="step"><span class="num">3</span><span class="step-name">prep() + bake()</span><span class="step-desc">learn from train, apply everywhere</span></div>
+<div class="step"><span class="num">4</span><span class="step-name">workflow()</span><span class="step-desc">bundle recipe + model</span></div>
+<div class="step"><span class="num">5</span><span class="step-name">fit() + augment()</span><span class="step-desc">train, then predict on new data</span></div>
+</div>
+
+---
+
+## Where This Goes Next{.unnumbered}
+
+<div class="card-rule"></div>
+
+::: {.fragment .fade-in}
+**Week 3** — once a model is fit, how do we know if it's actually any good? Metrics and resampling.
+:::
+
+::: {.fragment .fade-in}
+**Week 4–5** — new model types, same recipe-and-workflow scaffolding you're about to type today.
+:::
+
+::: {.fragment .fade-in .accent-box}
+Everything from here on reuses this pattern: split → recipe → workflow → fit. Today is the only day you build it from scratch.
+:::
+
+---
+
+## Let's Open the Codebook{.unnumbered}
+
+<div class="card-rule"></div>
+
+::: {.r-fit-text}
+Five stops.
+:::
+
+::: {.r-fit-text .accent}
+One reusable pattern.
+:::
