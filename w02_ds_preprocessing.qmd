@@ -620,6 +620,14 @@ tidy(mail_prep, number = 3) |> arrange(terms)
 ```{r tidy-impute}
 # Inspect imputation values (step 1 = step_impute_median)
 tidy(mail_prep, number = 1)
+
+# Compare with this
+mail_data |> summarise(income = median(income, na.rm = TRUE),
+                       age = median(age),
+                       recency_days = median(recency_days),
+                       freq_12mo = median(freq_12mo),
+                       avg_order_amt = median(avg_order_amt, na.rm = TRUE)
+)
 ```
 
 ------------------------------------------------------------------------
@@ -670,6 +678,30 @@ The split used `strata = responded`. Remove stratification and re-split five tim
 ```{r ex8-5, eval=FALSE}
 # Your code here
 
+```
+
+## ✏️ Exercise 8.6 — Data Leakage
+
+Prep the recipe correctly using `mail_train`, then bake `mail_test`. Next, incorrectly prep the same recipe using `mail_test`. Compare the normalization statistics for `income`. Why is the second approach considered data leakage?
+
+```{r ex8-6, eval=FALSE}
+# Your code here
+```
+
+## ✏️ Exercise 8.7 — Inspecting a Recipe
+
+Use `tidy(mail_prep)` to list the recipe steps. Then inspect the imputation values and normalization statistics using `tidy(mail_prep, number = 1)` and `tidy(mail_prep, number = 3)`. What values were learned during `prep()`?
+
+```{r ex8-7, eval=FALSE}
+# Your code here
+```
+
+## ✏️ Exercise 8.8 — Variable Roles
+
+Remove `update_role(customer_id, new_role = "ID")` from the recipe and re-prep it. What happens to `customer_id` in the baked data? Why should an ID variable not be used as a predictor?
+
+```{r ex8-8, eval=FALSE}
+# Your code here
 ```
 
 ------------------------------------------------------------------------
