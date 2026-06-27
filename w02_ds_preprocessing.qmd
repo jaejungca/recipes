@@ -622,12 +622,14 @@ tidy(mail_prep, number = 3) |> arrange(terms)
 tidy(mail_prep, number = 1)
 
 # Compare with this
-mail_data |> summarise(income = median(income, na.rm = TRUE),
-                       age = median(age),
-                       recency_days = median(recency_days),
-                       freq_12mo = median(freq_12mo),
-                       avg_order_amt = median(avg_order_amt, na.rm = TRUE)
-)
+mail_data |>
+  summarise(
+    income = median(income, na.rm = TRUE),
+    age = median(age),
+    recency_days = median(recency_days),
+    freq_12mo = median(freq_12mo),
+    avg_order_amt = median(avg_order_amt, na.rm = TRUE)
+  )
 ```
 
 ------------------------------------------------------------------------
