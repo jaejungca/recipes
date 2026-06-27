@@ -4914,7 +4914,16 @@ Computational engine: glmnet </code></pre>
 <details open class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Hint: use step_ordinalscore() from the recipes package</span></span>
-<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Your code here</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="co"># loyalty_tier is currently character. To be converted to ordinal scale, it must be an ordered factor first.</span></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>mail_data <span class="ot">&lt;-</span> mail_data <span class="sc">|&gt;</span></span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">loyalty_tier =</span> <span class="fu">factor</span>(</span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>      loyalty_tier,</span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>      <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">&quot;Bronze&quot;</span>, <span class="st">&quot;Silver&quot;</span>, <span class="st">&quot;Gold&quot;</span>, <span class="st">&quot;Platinum&quot;</span>),</span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>      <span class="at">ordered =</span> <span class="cn">TRUE</span></span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb34-11"><a href="#cb34-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Your code here</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
 </section>
@@ -6231,82 +6240,90 @@ loaded via a namespace (and not attached):
 <span id="cb43-653"><a href="#cb43-653" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb43-654"><a href="#cb43-654" aria-hidden="true" tabindex="-1"></a><span class="in">```{r ex8-2, eval=FALSE}</span></span>
 <span id="cb43-655"><a href="#cb43-655" aria-hidden="true" tabindex="-1"></a><span class="co"># Hint: use step_ordinalscore() from the recipes package</span></span>
-<span id="cb43-656"><a href="#cb43-656" aria-hidden="true" tabindex="-1"></a><span class="co"># Your code here</span></span>
-<span id="cb43-657"><a href="#cb43-657" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-658"><a href="#cb43-658" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb43-659"><a href="#cb43-659" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-660"><a href="#cb43-660" aria-hidden="true" tabindex="-1"></a><span class="fu">## ✏️ Exercise 8.3 — Interaction Term</span></span>
-<span id="cb43-661"><a href="#cb43-661" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-662"><a href="#cb43-662" aria-hidden="true" tabindex="-1"></a>Add an interaction between <span class="in">`freq_12mo`</span> and <span class="in">`log10(income)`</span> using <span class="in">`step_interact()`</span>. What is the marketing intuition for this interaction?</span>
-<span id="cb43-663"><a href="#cb43-663" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-664"><a href="#cb43-664" aria-hidden="true" tabindex="-1"></a><span class="in">```{r ex8-3, eval=FALSE}</span></span>
+<span id="cb43-656"><a href="#cb43-656" aria-hidden="true" tabindex="-1"></a><span class="co"># loyalty_tier is currently character. To be converted to ordinal scale, it must be an ordered factor first.</span></span>
+<span id="cb43-657"><a href="#cb43-657" aria-hidden="true" tabindex="-1"></a>mail_data <span class="ot">&lt;-</span> mail_data <span class="sc">|&gt;</span></span>
+<span id="cb43-658"><a href="#cb43-658" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb43-659"><a href="#cb43-659" aria-hidden="true" tabindex="-1"></a>    <span class="at">loyalty_tier =</span> <span class="fu">factor</span>(</span>
+<span id="cb43-660"><a href="#cb43-660" aria-hidden="true" tabindex="-1"></a>      loyalty_tier,</span>
+<span id="cb43-661"><a href="#cb43-661" aria-hidden="true" tabindex="-1"></a>      <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">&quot;Bronze&quot;</span>, <span class="st">&quot;Silver&quot;</span>, <span class="st">&quot;Gold&quot;</span>, <span class="st">&quot;Platinum&quot;</span>),</span>
+<span id="cb43-662"><a href="#cb43-662" aria-hidden="true" tabindex="-1"></a>      <span class="at">ordered =</span> <span class="cn">TRUE</span></span>
+<span id="cb43-663"><a href="#cb43-663" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb43-664"><a href="#cb43-664" aria-hidden="true" tabindex="-1"></a>  )</span>
 <span id="cb43-665"><a href="#cb43-665" aria-hidden="true" tabindex="-1"></a><span class="co"># Your code here</span></span>
-<span id="cb43-666"><a href="#cb43-666" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-667"><a href="#cb43-667" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb43-668"><a href="#cb43-668" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-669"><a href="#cb43-669" aria-hidden="true" tabindex="-1"></a><span class="fu">## ✏️ Exercise 8.4 — Remove a Step</span></span>
-<span id="cb43-670"><a href="#cb43-670" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-671"><a href="#cb43-671" aria-hidden="true" tabindex="-1"></a>Remove <span class="in">`step_normalize()`</span> from the recipe, retrain the Lasso, and compare <span class="in">`roc_auc`</span> before and after. What happens to model performance?</span>
-<span id="cb43-672"><a href="#cb43-672" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-673"><a href="#cb43-673" aria-hidden="true" tabindex="-1"></a><span class="in">```{r ex8-4, eval=FALSE}</span></span>
-<span id="cb43-674"><a href="#cb43-674" aria-hidden="true" tabindex="-1"></a><span class="co"># Your code here</span></span>
-<span id="cb43-675"><a href="#cb43-675" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-676"><a href="#cb43-676" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb43-677"><a href="#cb43-677" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-678"><a href="#cb43-678" aria-hidden="true" tabindex="-1"></a><span class="fu">## ✏️ Exercise 8.5 — Stratification Check</span></span>
-<span id="cb43-679"><a href="#cb43-679" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-680"><a href="#cb43-680" aria-hidden="true" tabindex="-1"></a>The split used <span class="in">`strata = responded`</span>. Remove stratification and re-split five times. Calculate the standard deviation of the response rate in the test sets. Does stratification reduce variance?</span>
-<span id="cb43-681"><a href="#cb43-681" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-682"><a href="#cb43-682" aria-hidden="true" tabindex="-1"></a><span class="in">```{r ex8-5, eval=FALSE}</span></span>
-<span id="cb43-683"><a href="#cb43-683" aria-hidden="true" tabindex="-1"></a><span class="co"># Your code here</span></span>
-<span id="cb43-684"><a href="#cb43-684" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-685"><a href="#cb43-685" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb43-686"><a href="#cb43-686" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-687"><a href="#cb43-687" aria-hidden="true" tabindex="-1"></a><span class="fu">## ✏️ Exercise 8.6 — Data Leakage</span></span>
-<span id="cb43-688"><a href="#cb43-688" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-689"><a href="#cb43-689" aria-hidden="true" tabindex="-1"></a>Prep the recipe correctly using <span class="in">`mail_train`</span>, then bake <span class="in">`mail_test`</span>. Next, incorrectly prep the same recipe using <span class="in">`mail_test`</span>. Compare the normalization statistics for <span class="in">`income`</span>. Why is the second approach considered data leakage?</span>
-<span id="cb43-690"><a href="#cb43-690" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-691"><a href="#cb43-691" aria-hidden="true" tabindex="-1"></a><span class="in">```{r ex8-6, eval=FALSE}</span></span>
-<span id="cb43-692"><a href="#cb43-692" aria-hidden="true" tabindex="-1"></a><span class="co"># Your code here</span></span>
+<span id="cb43-666"><a href="#cb43-666" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb43-667"><a href="#cb43-667" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-668"><a href="#cb43-668" aria-hidden="true" tabindex="-1"></a><span class="fu">## ✏️ Exercise 8.3 — Interaction Term</span></span>
+<span id="cb43-669"><a href="#cb43-669" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-670"><a href="#cb43-670" aria-hidden="true" tabindex="-1"></a>Add an interaction between <span class="in">`freq_12mo`</span> and <span class="in">`log10(income)`</span> using <span class="in">`step_interact()`</span>. What is the marketing intuition for this interaction?</span>
+<span id="cb43-671"><a href="#cb43-671" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-672"><a href="#cb43-672" aria-hidden="true" tabindex="-1"></a><span class="in">```{r ex8-3, eval=FALSE}</span></span>
+<span id="cb43-673"><a href="#cb43-673" aria-hidden="true" tabindex="-1"></a><span class="co"># Your code here</span></span>
+<span id="cb43-674"><a href="#cb43-674" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-675"><a href="#cb43-675" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb43-676"><a href="#cb43-676" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-677"><a href="#cb43-677" aria-hidden="true" tabindex="-1"></a><span class="fu">## ✏️ Exercise 8.4 — Remove a Step</span></span>
+<span id="cb43-678"><a href="#cb43-678" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-679"><a href="#cb43-679" aria-hidden="true" tabindex="-1"></a>Remove <span class="in">`step_normalize()`</span> from the recipe, retrain the Lasso, and compare <span class="in">`roc_auc`</span> before and after. What happens to model performance?</span>
+<span id="cb43-680"><a href="#cb43-680" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-681"><a href="#cb43-681" aria-hidden="true" tabindex="-1"></a><span class="in">```{r ex8-4, eval=FALSE}</span></span>
+<span id="cb43-682"><a href="#cb43-682" aria-hidden="true" tabindex="-1"></a><span class="co"># Your code here</span></span>
+<span id="cb43-683"><a href="#cb43-683" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-684"><a href="#cb43-684" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb43-685"><a href="#cb43-685" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-686"><a href="#cb43-686" aria-hidden="true" tabindex="-1"></a><span class="fu">## ✏️ Exercise 8.5 — Stratification Check</span></span>
+<span id="cb43-687"><a href="#cb43-687" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-688"><a href="#cb43-688" aria-hidden="true" tabindex="-1"></a>The split used <span class="in">`strata = responded`</span>. Remove stratification and re-split five times. Calculate the standard deviation of the response rate in the test sets. Does stratification reduce variance?</span>
+<span id="cb43-689"><a href="#cb43-689" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-690"><a href="#cb43-690" aria-hidden="true" tabindex="-1"></a><span class="in">```{r ex8-5, eval=FALSE}</span></span>
+<span id="cb43-691"><a href="#cb43-691" aria-hidden="true" tabindex="-1"></a><span class="co"># Your code here</span></span>
+<span id="cb43-692"><a href="#cb43-692" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb43-693"><a href="#cb43-693" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb43-694"><a href="#cb43-694" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-695"><a href="#cb43-695" aria-hidden="true" tabindex="-1"></a><span class="fu">## ✏️ Exercise 8.7 — Inspecting a Recipe</span></span>
+<span id="cb43-695"><a href="#cb43-695" aria-hidden="true" tabindex="-1"></a><span class="fu">## ✏️ Exercise 8.6 — Data Leakage</span></span>
 <span id="cb43-696"><a href="#cb43-696" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-697"><a href="#cb43-697" aria-hidden="true" tabindex="-1"></a>Use <span class="in">`tidy(mail_prep)`</span> to list the recipe steps. Then inspect the imputation values and normalization statistics using <span class="in">`tidy(mail_prep, number = 1)`</span> and <span class="in">`tidy(mail_prep, number = 3)`</span>. What values were learned during <span class="in">`prep()`</span>?</span>
+<span id="cb43-697"><a href="#cb43-697" aria-hidden="true" tabindex="-1"></a>Prep the recipe correctly using <span class="in">`mail_train`</span>, then bake <span class="in">`mail_test`</span>. Next, incorrectly prep the same recipe using <span class="in">`mail_test`</span>. Compare the normalization statistics for <span class="in">`income`</span>. Why is the second approach considered data leakage?</span>
 <span id="cb43-698"><a href="#cb43-698" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-699"><a href="#cb43-699" aria-hidden="true" tabindex="-1"></a><span class="in">```{r ex8-7, eval=FALSE}</span></span>
+<span id="cb43-699"><a href="#cb43-699" aria-hidden="true" tabindex="-1"></a><span class="in">```{r ex8-6, eval=FALSE}</span></span>
 <span id="cb43-700"><a href="#cb43-700" aria-hidden="true" tabindex="-1"></a><span class="co"># Your code here</span></span>
 <span id="cb43-701"><a href="#cb43-701" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb43-702"><a href="#cb43-702" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-703"><a href="#cb43-703" aria-hidden="true" tabindex="-1"></a><span class="fu">## ✏️ Exercise 8.8 — Variable Roles</span></span>
+<span id="cb43-703"><a href="#cb43-703" aria-hidden="true" tabindex="-1"></a><span class="fu">## ✏️ Exercise 8.7 — Inspecting a Recipe</span></span>
 <span id="cb43-704"><a href="#cb43-704" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-705"><a href="#cb43-705" aria-hidden="true" tabindex="-1"></a>Remove <span class="in">`update_role(customer_id, new_role = &quot;ID&quot;)`</span> from the recipe and re-prep it. What happens to <span class="in">`customer_id`</span> in the baked data? Why should an ID variable not be used as a predictor?</span>
+<span id="cb43-705"><a href="#cb43-705" aria-hidden="true" tabindex="-1"></a>Use <span class="in">`tidy(mail_prep)`</span> to list the recipe steps. Then inspect the imputation values and normalization statistics using <span class="in">`tidy(mail_prep, number = 1)`</span> and <span class="in">`tidy(mail_prep, number = 3)`</span>. What values were learned during <span class="in">`prep()`</span>?</span>
 <span id="cb43-706"><a href="#cb43-706" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-707"><a href="#cb43-707" aria-hidden="true" tabindex="-1"></a><span class="in">```{r ex8-8, eval=FALSE}</span></span>
+<span id="cb43-707"><a href="#cb43-707" aria-hidden="true" tabindex="-1"></a><span class="in">```{r ex8-7, eval=FALSE}</span></span>
 <span id="cb43-708"><a href="#cb43-708" aria-hidden="true" tabindex="-1"></a><span class="co"># Your code here</span></span>
 <span id="cb43-709"><a href="#cb43-709" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb43-710"><a href="#cb43-710" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-711"><a href="#cb43-711" aria-hidden="true" tabindex="-1"></a>------------------------------------------------------------------------</span>
+<span id="cb43-711"><a href="#cb43-711" aria-hidden="true" tabindex="-1"></a><span class="fu">## ✏️ Exercise 8.8 — Variable Roles</span></span>
 <span id="cb43-712"><a href="#cb43-712" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-713"><a href="#cb43-713" aria-hidden="true" tabindex="-1"></a><span class="fu"># Summary</span></span>
+<span id="cb43-713"><a href="#cb43-713" aria-hidden="true" tabindex="-1"></a>Remove <span class="in">`update_role(customer_id, new_role = &quot;ID&quot;)`</span> from the recipe and re-prep it. What happens to <span class="in">`customer_id`</span> in the baked data? Why should an ID variable not be used as a predictor?</span>
 <span id="cb43-714"><a href="#cb43-714" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-715"><a href="#cb43-715" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Concept               <span class="pp">|</span> Function               <span class="pp">|</span> Key Argument               <span class="pp">|</span></span>
-<span id="cb43-716"><a href="#cb43-716" aria-hidden="true" tabindex="-1"></a><span class="pp">|-----------------------|------------------------|----------------------------|</span></span>
-<span id="cb43-717"><a href="#cb43-717" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Data split            <span class="pp">|</span> <span class="in">`initial_split()`</span>      <span class="pp">|</span> <span class="in">`prop`</span>, <span class="in">`strata`</span>           <span class="pp">|</span></span>
-<span id="cb43-718"><a href="#cb43-718" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Training set          <span class="pp">|</span> <span class="in">`training()`</span>           <span class="pp">|</span> —                          <span class="pp">|</span></span>
-<span id="cb43-719"><a href="#cb43-719" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Test set              <span class="pp">|</span> <span class="in">`testing()`</span>            <span class="pp">|</span> —                          <span class="pp">|</span></span>
-<span id="cb43-720"><a href="#cb43-720" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Define recipe         <span class="pp">|</span> <span class="in">`recipe()`</span>             <span class="pp">|</span> formula, <span class="in">`data = train`</span>    <span class="pp">|</span></span>
-<span id="cb43-721"><a href="#cb43-721" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Log transform         <span class="pp">|</span> <span class="in">`step_log()`</span>           <span class="pp">|</span> <span class="in">`base`</span>, <span class="in">`offset`</span>           <span class="pp">|</span></span>
-<span id="cb43-722"><a href="#cb43-722" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Median impute         <span class="pp">|</span> <span class="in">`step_impute_median()`</span> <span class="pp">|</span> selector                   <span class="pp">|</span></span>
-<span id="cb43-723"><a href="#cb43-723" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Normalize             <span class="pp">|</span> <span class="in">`step_normalize()`</span>     <span class="pp">|</span> selector                   <span class="pp">|</span></span>
-<span id="cb43-724"><a href="#cb43-724" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Dummy encode          <span class="pp">|</span> <span class="in">`step_dummy()`</span>         <span class="pp">|</span> <span class="in">`all_nominal_predictors()`</span> <span class="pp">|</span></span>
-<span id="cb43-725"><a href="#cb43-725" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Estimate steps        <span class="pp">|</span> <span class="in">`prep()`</span>               <span class="pp">|</span> <span class="in">`training = train`</span>         <span class="pp">|</span></span>
-<span id="cb43-726"><a href="#cb43-726" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Apply steps           <span class="pp">|</span> <span class="in">`bake()`</span>               <span class="pp">|</span> <span class="in">`new_data = test`</span>          <span class="pp">|</span></span>
-<span id="cb43-727"><a href="#cb43-727" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Bundle recipe + model <span class="pp">|</span> <span class="in">`workflow()`</span>           <span class="pp">|</span> —                          <span class="pp">|</span></span>
-<span id="cb43-728"><a href="#cb43-728" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-729"><a href="#cb43-729" aria-hidden="true" tabindex="-1"></a><span class="in">```{r session-info}</span></span>
-<span id="cb43-730"><a href="#cb43-730" aria-hidden="true" tabindex="-1"></a><span class="fu">sessionInfo</span>()</span>
-<span id="cb43-731"><a href="#cb43-731" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb43-715"><a href="#cb43-715" aria-hidden="true" tabindex="-1"></a><span class="in">```{r ex8-8, eval=FALSE}</span></span>
+<span id="cb43-716"><a href="#cb43-716" aria-hidden="true" tabindex="-1"></a><span class="co"># Your code here</span></span>
+<span id="cb43-717"><a href="#cb43-717" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb43-718"><a href="#cb43-718" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-719"><a href="#cb43-719" aria-hidden="true" tabindex="-1"></a>------------------------------------------------------------------------</span>
+<span id="cb43-720"><a href="#cb43-720" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-721"><a href="#cb43-721" aria-hidden="true" tabindex="-1"></a><span class="fu"># Summary</span></span>
+<span id="cb43-722"><a href="#cb43-722" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-723"><a href="#cb43-723" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Concept               <span class="pp">|</span> Function               <span class="pp">|</span> Key Argument               <span class="pp">|</span></span>
+<span id="cb43-724"><a href="#cb43-724" aria-hidden="true" tabindex="-1"></a><span class="pp">|-----------------------|------------------------|----------------------------|</span></span>
+<span id="cb43-725"><a href="#cb43-725" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Data split            <span class="pp">|</span> <span class="in">`initial_split()`</span>      <span class="pp">|</span> <span class="in">`prop`</span>, <span class="in">`strata`</span>           <span class="pp">|</span></span>
+<span id="cb43-726"><a href="#cb43-726" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Training set          <span class="pp">|</span> <span class="in">`training()`</span>           <span class="pp">|</span> —                          <span class="pp">|</span></span>
+<span id="cb43-727"><a href="#cb43-727" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Test set              <span class="pp">|</span> <span class="in">`testing()`</span>            <span class="pp">|</span> —                          <span class="pp">|</span></span>
+<span id="cb43-728"><a href="#cb43-728" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Define recipe         <span class="pp">|</span> <span class="in">`recipe()`</span>             <span class="pp">|</span> formula, <span class="in">`data = train`</span>    <span class="pp">|</span></span>
+<span id="cb43-729"><a href="#cb43-729" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Log transform         <span class="pp">|</span> <span class="in">`step_log()`</span>           <span class="pp">|</span> <span class="in">`base`</span>, <span class="in">`offset`</span>           <span class="pp">|</span></span>
+<span id="cb43-730"><a href="#cb43-730" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Median impute         <span class="pp">|</span> <span class="in">`step_impute_median()`</span> <span class="pp">|</span> selector                   <span class="pp">|</span></span>
+<span id="cb43-731"><a href="#cb43-731" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Normalize             <span class="pp">|</span> <span class="in">`step_normalize()`</span>     <span class="pp">|</span> selector                   <span class="pp">|</span></span>
+<span id="cb43-732"><a href="#cb43-732" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Dummy encode          <span class="pp">|</span> <span class="in">`step_dummy()`</span>         <span class="pp">|</span> <span class="in">`all_nominal_predictors()`</span> <span class="pp">|</span></span>
+<span id="cb43-733"><a href="#cb43-733" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Estimate steps        <span class="pp">|</span> <span class="in">`prep()`</span>               <span class="pp">|</span> <span class="in">`training = train`</span>         <span class="pp">|</span></span>
+<span id="cb43-734"><a href="#cb43-734" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Apply steps           <span class="pp">|</span> <span class="in">`bake()`</span>               <span class="pp">|</span> <span class="in">`new_data = test`</span>          <span class="pp">|</span></span>
+<span id="cb43-735"><a href="#cb43-735" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Bundle recipe + model <span class="pp">|</span> <span class="in">`workflow()`</span>           <span class="pp">|</span> —                          <span class="pp">|</span></span>
+<span id="cb43-736"><a href="#cb43-736" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-737"><a href="#cb43-737" aria-hidden="true" tabindex="-1"></a><span class="in">```{r session-info}</span></span>
+<span id="cb43-738"><a href="#cb43-738" aria-hidden="true" tabindex="-1"></a><span class="fu">sessionInfo</span>()</span>
+<span id="cb43-739"><a href="#cb43-739" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 </code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->

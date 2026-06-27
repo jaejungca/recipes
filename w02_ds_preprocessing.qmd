@@ -651,8 +651,16 @@ Replace `step_impute_median()` with `step_impute_mean()`. Re-prep the recipe and
 
 ```{r ex8-2, eval=FALSE}
 # Hint: use step_ordinalscore() from the recipes package
+# loyalty_tier is currently character. To be converted to ordinal scale, it must be an ordered factor first.
+mail_data <- mail_data |>
+  mutate(
+    loyalty_tier = factor(
+      loyalty_tier,
+      levels = c("Bronze", "Silver", "Gold", "Platinum"),
+      ordered = TRUE
+    )
+  )
 # Your code here
-
 ```
 
 ## ✏️ Exercise 8.3 — Interaction Term
