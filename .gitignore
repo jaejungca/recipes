@@ -1,7 +1,6 @@
-ch08*.html
-ch08*.qmd
 /.quarto/
 **/*.quarto_ipynb
-*_practice
+*practice.qmd
 week*
 answers
+.Rproj.user
