@@ -1,7 +1,7 @@
 ---
-title: "Data Splitting & Preprocessing with recipes"
+title: "M2 - Data Splitting (Ch5) & Preprocessing with recipes (Ch8)"
 subtitle: "A map before we open the codebook"
-author: "Jae Jung · IBM 6540"
+author: "Jae Min Jung"
 date: today
 format:
   revealjs:

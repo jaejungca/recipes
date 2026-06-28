@@ -1,6 +1,6 @@
 ---
 title: "Video Quiz: Foundations of Logistic Regression"
-subtitle: "IBM 6540 — Applied Machine Learning for Marketing | Steps 1-1 through 2-1"
+subtitle: "Prelude to Module 2, Steps 1-1 through 2-1"
 author: "Jae Jung"
 date: today
 format:
@@ -17,7 +17,7 @@ format:
     highlight-style: github
     df-print: paged
     link-external-newwindow: true
-    embed-resources: true
+    #embed-resources: true
 execute:
   warning: false
   message: false

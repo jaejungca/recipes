@@ -1,0 +1,106 @@
+---
+title: "Module 2 Slides — Data Splitting & Preprocessing"
+subtitle: "A map before we open the codebook"
+date: today
+---
+
+## About These Slides
+
+This slide deck gives you a **big-picture overview** of Module 2 before you
+work through the full codebook. Think of it as the map, not the territory —
+27 slides covering the five stops of the module at a conceptual level, with
+just enough code to orient you before you see the full implementation.
+
+Work through these slides **after** the Video Quiz and **before** the
+Codebook. They take about 15–20 minutes to read through at your own pace.
+
+---
+
+## What the Slides Cover
+
+The deck is organized around five stops:
+
+**Stop 1 — The Dataset**
+
+- The synthetic direct-mail campaign and its variables
+- Why `income` is right-skewed and what that means for modeling
+- The log-normal distribution and the geometric standard deviation
+
+**Stop 2 — The Split**
+
+- The golden rule: fit on training data, apply to test data
+- Why evaluating on training data is optimistic (data leakage)
+- Stratified splitting with `initial_split()` and `strata = responded`
+
+**Stop 3 — The Recipe**
+
+- The cooking metaphor: `recipe()`, `step_*()`, `prep()`, `bake()`
+- All six steps in the pipeline and the reason each one exists
+- Why `step_impute_median()` beats mean for skewed data
+- Why `step_log(..., offset = 1)` needs the offset
+
+**Stop 4 — The Workflow**
+
+- Bundling recipe + model with `workflow()` so nothing gets forgotten
+- Regularization at a glance — Ridge, Lasso, Elastic Net
+- Why `penalty = 0.01` and `mixture = 1` gives you a Lasso
+
+**Stop 5 — Inspecting the Recipe**
+
+- Using `tidy()` to read what `prep()` learned
+- The "what you'll actually type today" summary
+- Where this pattern reappears in later modules
+
+---
+
+## Open the Slides
+
+::: {.callout-tip}
+The slides open in a **new tab** as a full-screen presentation. Use the
+arrow keys or click to advance. Press **F** for full screen, **S** for
+speaker notes, and **Esc** to exit full screen.
+:::
+
+```{=html}
+<a href="w02_ds_preprocessing_slides.html"
+   target="_blank"
+   rel="noopener noreferrer"
+   style="
+     display: inline-block;
+     margin-top: 0.5rem;
+     padding: 0.65rem 1.4rem;
+     background-color: #2780e3;
+     color: white;
+     font-weight: 600;
+     font-size: 1rem;
+     border-radius: 6px;
+     text-decoration: none;
+     transition: background-color 0.2s ease;
+   "
+   onmouseover="this.style.backgroundColor='#1a5fb4'"
+   onmouseout="this.style.backgroundColor='#2780e3'"
+>
+  ▶ Open Slide Deck in New Tab
+</a>
+```
+
+---
+
+## Key R Functions Introduced in the Slides
+
+| Function | Package | Purpose |
+|---|---|---|
+| `initial_split()` | `rsample` | Split data into train/test |
+| `training()`, `testing()` | `rsample` | Extract each partition |
+| `recipe()` | `recipes` | Declare a preprocessing plan |
+| `step_impute_median()` | `recipes` | Fill missing values with median |
+| `step_log()` | `recipes` | Log-transform numeric variables |
+| `step_normalize()` | `recipes` | Center and scale to mean=0, sd=1 |
+| `step_dummy()` | `recipes` | Encode categorical variables as 0/1 |
+| `step_zv()` | `recipes` | Remove zero-variance predictors |
+| `update_role()` | `recipes` | Mark ID columns as non-predictors |
+| `prep()` | `recipes` | Learn transformations from training data |
+| `bake()` | `recipes` | Apply learned transformations to any data |
+| `workflow()` | `workflows` | Bundle recipe + model spec |
+| `fit()` | `workflows` | Train the full pipeline |
+| `tidy()` | `broom` | Inspect what a prepped recipe learned |

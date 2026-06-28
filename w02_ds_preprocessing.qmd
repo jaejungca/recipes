@@ -1,6 +1,6 @@
 ---
-title: "Week 2: Data Splitting and Preprocessing with recipes"
-subtitle: "IBM 6540 — Applied Machine Learning for Marketing"
+title: "M2 - Data Splitting and Preprocessing with recipes"
+subtitle: "Codebook with Exercises"
 author: "Jae Min Jung"
 date: today
 format:
@@ -17,7 +17,7 @@ format:
     highlight-style: github
     df-print: paged
     link-external-newwindow: true
-    embed-resources: true
+    #embed-resources: true
 execute:
   warning: false
   message: false

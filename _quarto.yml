@@ -1,2 +1,43 @@
 project:
+  type: website
   output-dir: docs
+
+website:
+  title: "Module 2 — Data Splitting & Preprocessing"
+  description: "Foundations of data preparation for machine learning in marketing"
+  favicon: ""
+  page-footer:
+    left: "Cal Poly Pomona · Applied Machine Learning"
+    right: "Built with [Quarto](https://quarto.org)"
+  navbar:
+    background: primary
+    foreground: light
+    left:
+      - href: index.qmd
+        text: Home
+      - href: w02_video_quiz_combined.qmd
+        text: Video Quiz
+      - href: slides.qmd
+        text: Slides
+      - href: w02_ds_preprocessing.qmd
+        text: Codebook
+      - href: w02_log_assignments.qmd
+        text: Log Assignments
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-location: right-body
+    toc-expand: 1
+    code-fold: show
+    code-tools: true
+    highlight-style: github
+    df-print: paged
+    link-external-newwindow: true
+    embed-resources: false
+
+execute:
+  warning: false
+  message: false
+  freeze: true

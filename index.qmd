@@ -1,0 +1,263 @@
+---
+title: "Module 2 — Data Splitting & Preprocessing"
+subtitle: "Cal Poly Pomona · Applied Machine Learning"
+date: today
+format:
+  html:
+    toc: false
+    number-sections: false
+---
+
+```{=html}
+<style>
+  .module-intro {
+    font-size: 1.05em;
+    line-height: 1.6;
+    color: #444;
+    max-width: 780px;
+    margin-bottom: 2rem;
+  }
+
+  .how-to {
+    background: #f0f4f8;
+    border-left: 4px solid #2780e3;
+    padding: 0.75rem 1.1rem;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 2.5rem;
+    font-size: 0.95em;
+    max-width: 780px;
+  }
+
+  .how-to strong { color: #2780e3; }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+  }
+
+  .page-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow 0.2s ease;
+  }
+
+  .page-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  }
+
+  .card-header {
+    padding: 0.75rem 1.1rem 0.6rem 1.1rem;
+    border-top: 4px solid #2780e3;
+    background: #f8f9fa;
+  }
+
+  .card-header .card-step {
+    font-size: 0.72em;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #2780e3;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+  }
+
+  .card-header h3 {
+    margin: 0;
+    font-size: 1.05em;
+    font-weight: 700;
+    color: #1a1a1a;
+  }
+
+  .card-header h3 a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .card-header h3 a:hover {
+    color: #2780e3;
+    text-decoration: underline;
+  }
+
+  .card-body {
+    padding: 0.9rem 1.1rem 1rem 1.1rem;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .card-desc {
+    font-size: 0.88em;
+    color: #444;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .skills-label {
+    font-size: 0.72em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #888;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+  }
+
+  .skills-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.82em;
+    color: #333;
+    line-height: 1.55;
+  }
+
+  .skills-list li {
+    margin-bottom: 0.2rem;
+  }
+
+  .card-footer-link {
+    display: inline-block;
+    margin-top: 0.6rem;
+    font-size: 0.82em;
+    color: #2780e3;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .card-footer-link:hover {
+    text-decoration: underline;
+  }
+</style>
+```
+
+::: module-intro
+This module covers the foundations of preparing marketing data for machine learning: understanding the probabilistic tools behind classification models, splitting data in a principled way, building reusable preprocessing pipelines with `recipes`, and verifying that each transformation does what you intend. Work through the four pages below in the suggested order.
+:::
+
+::: how-to
+**Suggested order:** Start with the **Video Quiz** to build conceptual foundations → review the **Slides** for a big-picture map → work through the **Codebook** for hands-on R practice → complete the **Log Assignments** to solidify the mathematics.
+:::
+
+```{=html}
+<div class="card-grid">
+
+  <!-- Card 1: Video Quiz -->
+  <div class="page-card">
+    <div class="card-header">
+      <div class="card-step">Start here · Conceptual foundations</div>
+      <h3><a href="w02_video_quiz_combined.qmd">Video Quiz</a></h3>
+    </div>
+    <div class="card-body">
+      <p class="card-desc">
+        Test your understanding of four StatQuest videos that build the
+        mathematical foundation for logistic regression — from logarithms to
+        odds to classification models.
+      </p>
+      <div>
+        <div class="skills-label">Key concepts &amp; skills</div>
+        <ul class="skills-list">
+          <li>Logarithms — isolating exponents, base conversion, geometric mean</li>
+          <li>Odds vs. probability — converting between the two</li>
+          <li>Log(odds) / logit — symmetry and the real line</li>
+          <li>Odds ratios — effect size and direction</li>
+          <li>Significance tests — Fisher's exact, chi-square, Wald</li>
+          <li>Logistic vs. linear regression — S-curve, maximum likelihood</li>
+          <li>R: <code>log()</code>, <code>exp()</code>, <code>plogis()</code>, <code>fisher.test()</code>, <code>chisq.test()</code></li>
+        </ul>
+      </div>
+      <a class="card-footer-link" href="w02_video_quiz_combined.qmd">Open Video Quiz →</a>
+    </div>
+  </div>
+
+  <!-- Card 2: Slides -->
+  <div class="page-card">
+    <div class="card-header">
+      <div class="card-step">Step 2 · Big-picture map</div>
+      <h3><a href="slides.qmd">Slides</a></h3>
+    </div>
+    <div class="card-body">
+      <p class="card-desc">
+        A visual overview of the module's five stops — the dataset, the split,
+        the recipe, the workflow, and inspection — before diving into the full
+        codebook.
+      </p>
+      <div>
+        <div class="skills-label">Key concepts &amp; skills</div>
+        <ul class="skills-list">
+          <li>Why log-transform right-skewed variables (income)</li>
+          <li>The golden rule of data splitting — train vs. test</li>
+          <li>Stratified splitting for imbalanced outcomes</li>
+          <li>The six-step <code>recipe()</code> pipeline at a glance</li>
+          <li>Regularization — Ridge, Lasso, Elastic Net</li>
+          <li>Bundling recipe + model into a <code>workflow()</code></li>
+          <li>Inspecting a prepped recipe with <code>tidy()</code></li>
+        </ul>
+      </div>
+      <a class="card-footer-link" href="slides.qmd">Open Slides page →</a>
+    </div>
+  </div>
+
+  <!-- Card 3: Codebook -->
+  <div class="page-card">
+    <div class="card-header">
+      <div class="card-step">Step 3 · Hands-on R practice</div>
+      <h3><a href="w02_ds_preprocessing.qmd">Codebook</a></h3>
+    </div>
+    <div class="card-body">
+      <p class="card-desc">
+        The main hands-on notebook. Work through the direct-mail dataset from
+        raw data to a fitted Lasso logistic regression, with nine exercises
+        covering common pitfalls and extensions.
+      </p>
+      <div>
+        <div class="skills-label">Key concepts &amp; skills</div>
+        <ul class="skills-list">
+          <li>Log-normal income — understanding right skew visually</li>
+          <li><code>initial_split()</code> with stratification</li>
+          <li><code>recipe()</code> — declaring a preprocessing plan</li>
+          <li><code>step_impute_median()</code>, <code>step_log()</code>, <code>step_normalize()</code></li>
+          <li><code>step_dummy()</code>, <code>step_zv()</code>, <code>update_role()</code></li>
+          <li><code>prep()</code> / <code>bake()</code> — learn vs. apply</li>
+          <li><code>workflow()</code>, <code>fit()</code>, <code>augment()</code></li>
+          <li>Data leakage — why prepping on test data is wrong</li>
+          <li>Variable roles — why ID columns must not be predictors</li>
+        </ul>
+      </div>
+      <a class="card-footer-link" href="w02_ds_preprocessing.qmd">Open Codebook →</a>
+    </div>
+  </div>
+
+  <!-- Card 4: Log Assignments -->
+  <div class="page-card">
+    <div class="card-header">
+      <div class="card-step">Step 4 · Solidify the mathematics</div>
+      <h3><a href="w02_log_assignments.qmd">Log Assignments</a></h3>
+    </div>
+    <div class="card-body">
+      <p class="card-desc">
+        Five focused assignments that verify your ability to perform log
+        transformations in R — converting between dollar and log scale,
+        back-transforming medians and means, and understanding why base
+        choice is irrelevant after normalization.
+      </p>
+      <div>
+        <div class="skills-label">Key concepts &amp; skills</div>
+        <ul class="skills-list">
+          <li>Dollar → log: <code>log()</code> and <code>log10()</code></li>
+          <li>Log → dollar: <code>exp()</code> and <code>10^x</code></li>
+          <li>Log-normal median vs. mean — the <code>σ²/2</code> correction</li>
+          <li>Geometric standard deviation — multiply/divide, not add/subtract</li>
+          <li>Empirical vs. theoretical values in real data</li>
+          <li>Base 10 vs. natural log — constant ratio, same result after <code>step_normalize()</code></li>
+          <li>R: <code>mutate()</code>, <code>summarise()</code>, <code>tibble()</code></li>
+        </ul>
+      </div>
+      <a class="card-footer-link" href="w02_log_assignments.qmd">Open Log Assignments →</a>
+    </div>
+  </div>
+
+</div>
+```

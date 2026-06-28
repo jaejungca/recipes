@@ -1,6 +1,6 @@
 ---
-title: "Week 2 Assignments: Logarithms in R"
-subtitle: "IBM 6540 — Applied Machine Learning for Marketing"
+title: "M2 Codebook Assignments: Logarithms in R"
+subtitle: "M2 - Data Splitting and Preprocessing with recipes"
 author: "Jae Jung"
 date: today
 format:
@@ -17,7 +17,7 @@ format:
     highlight-style: github
     df-print: paged
     link-external-newwindow: true
-    embed-resources: true
+    #embed-resources: true
 execute:
   warning: false
   message: false
