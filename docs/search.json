@@ -1,12 +1,5 @@
 [
   {
-    "objectID": "index.html",
-    "href": "index.html",
-    "title": "Module 2 — Data Splitting & Preprocessing",
-    "section": "",
-    "text": "This module covers the foundations of preparing marketing data for machine learning: understanding the probabilistic tools behind classification models, splitting data in a principled way, building reusable preprocessing pipelines with recipes, and verifying that each transformation does what you intend. Work through the four pages below in the suggested order.\n\n\nSuggested order: Start with the Video Quiz to build conceptual foundations → review the Slides for a big-picture map → work through the Codebook for hands-on R practice → complete the Log Assignments to solidify the mathematics.\n\n\n\n  \n  \n    \n      Start here · Conceptual foundations\n      Video Quiz\n    \n    \n      \n        Test your understanding of four StatQuest videos that build the\n        mathematical foundation for logistic regression — from logarithms to\n        odds to classification models.\n      \n      \n        Key concepts & skills\n        \n          Logarithms — isolating exponents, base conversion, geometric mean\n          Odds vs. probability — converting between the two\n          Log(odds) / logit — symmetry and the real line\n          Odds ratios — effect size and direction\n          Significance tests — Fisher's exact, chi-square, Wald\n          Logistic vs. linear regression — S-curve, maximum likelihood\n          R: log(), exp(), plogis(), fisher.test(), chisq.test()\n        \n      \n      Open Video Quiz →\n    \n  \n\n  \n  \n    \n      Step 2 · Big-picture map\n      Slides\n    \n    \n      \n        A visual overview of the module's five stops — the dataset, the split,\n        the recipe, the workflow, and inspection — before diving into the full\n        codebook.\n      \n      \n        Key concepts & skills\n        \n          Why log-transform right-skewed variables (income)\n          The golden rule of data splitting — train vs. test\n          Stratified splitting for imbalanced outcomes\n          The six-step recipe() pipeline at a glance\n          Regularization — Ridge, Lasso, Elastic Net\n          Bundling recipe + model into a workflow()\n          Inspecting a prepped recipe with tidy()\n        \n      \n      Open Slides page →\n    \n  \n\n  \n  \n    \n      Step 3 · Hands-on R practice\n      Codebook\n    \n    \n      \n        The main hands-on notebook. Work through the direct-mail dataset from\n        raw data to a fitted Lasso logistic regression, with nine exercises\n        covering common pitfalls and extensions.\n      \n      \n        Key concepts & skills\n        \n          Log-normal income — understanding right skew visually\n          initial_split() with stratification\n          recipe() — declaring a preprocessing plan\n          step_impute_median(), step_log(), step_normalize()\n          step_dummy(), step_zv(), update_role()\n          prep() / bake() — learn vs. apply\n          workflow(), fit(), augment()\n          Data leakage — why prepping on test data is wrong\n          Variable roles — why ID columns must not be predictors\n        \n      \n      Open Codebook →\n    \n  \n\n  \n  \n    \n      Step 4 · Solidify the mathematics\n      Log Assignments\n    \n    \n      \n        Five focused assignments that verify your ability to perform log\n        transformations in R — converting between dollar and log scale,\n        back-transforming medians and means, and understanding why base\n        choice is irrelevant after normalization.\n      \n      \n        Key concepts & skills\n        \n          Dollar → log: log() and log10()\n          Log → dollar: exp() and 10^x\n          Log-normal median vs. mean — the σ²/2 correction\n          Geometric standard deviation — multiply/divide, not add/subtract\n          Empirical vs. theoretical values in real data\n          Base 10 vs. natural log — constant ratio, same result after step_normalize()\n          R: mutate(), summarise(), tibble()\n        \n      \n      Open Log Assignments →"
-  },
-  {
     "objectID": "w02_video_quiz_combined.html",
     "href": "w02_video_quiz_combined.html",
     "title": "Video Quiz: Foundations of Logistic Regression",
@@ -175,11 +168,655 @@
     "text": "4.6 Q23 — Synthesis: From Logs to Logistic Regression\nThis final question ties all four videos together.\nWritten question (3–5 sentences):\nThe four videos form a conceptual chain: Logs → Odds → Odds Ratios → Logistic Regression.\n\nExplain in your own words how each step connects to the next:\n\nWhy do we take the log of odds (not just use odds directly)?\nWhy do we compare odds as a ratio rather than a difference?\nHow does the logit (log odds) become the linear predictor inside logistic regression?\n\nIn the context of the direct-mail campaign in mail_data, describe in one sentence what the logistic regression model is actually computing when it produces .pred_yes = 0.08 for a specific customer."
   },
   {
-    "objectID": "w02_ds_preprocessing_slides.html",
-    "href": "w02_ds_preprocessing_slides.html",
-    "title": "M2 - Data Splitting (Ch5) & Preprocessing with recipes (Ch8)",
+    "objectID": "w02_ds_prep_practice.html",
+    "href": "w02_ds_prep_practice.html",
+    "title": "Data Splitting and Preprocessing with Recipes",
     "section": "",
-    "text": "Before We Open the Codebook\n  Today’s Five Stops\n  Stop 1 — The Dataset\n  \n  Meet the Prospects\n  Two Problems, Hiding in Plain Sight\n  Why Log Income?\n  \n  Stop 2 — The Split\n  \n  The Golden Rule\n  Why the Test Set Exists\n  Stratified Splitting\n  \n  Stop 3 — The Recipe\n  \n  Why “Recipe”?\n  Six Steps, One Pipeline\n  Step 2 — Impute: Median, Not Mean\n  Step 3 — Log Transform\n  Step 4 — Normalize\n  Step 5 — Dummy Encode\n  The Golden Rule, Applied to Recipes\n  \n  Stop 4 — The Workflow\n  \n  Why Bundle Them?\n  A Quick Word on Regularization\n  Today We Fix the Knobs\n  \n  Stop 5 — Inspecting the Recipe\n  \n  Don’t Just Trust It — Look Inside\n  What You’ll Actually Type Today\n  Where This Goes Next\n  Let’s Open the Codebook"
+    "text": "On this page\n   \n  \n  1 Setup\n  2 The Data Set\n  3 Data Splitting\n  4 Build a Recipe\n  \n\n\n1 Setup\n\n\nCode\nlibrary(tidymodels)\nlibrary(tidyverse)\nlibrary(janitor)\nlibrary(skimr)\n\ntidymodels_prefer()\n\n\n\n\n2 The Data Set\n\n\nCode\n# ── Synthetic direct-mail dataset ──────────────────────────────────────────────\nset.seed(123)\nn &lt;- 3000\n\nmail_data &lt;- tibble(\n  customer_id = paste0(\"C\", str_pad(1:n, 5, pad = \"0\")),\n  age = round(rnorm(n, mean = 45, sd = 12)),\n  income = round(rlnorm(n, meanlog = 10.8, sdlog = 0.6)), # right-skewed\n  recency_days = round(rexp(n, rate = 1 / 60)), # days since last purchase\n  freq_12mo = rpois(n, lambda = 3), # purchases in 12 months\n  avg_order_amt = round(rlnorm(n, meanlog = 4.2, sdlog = 0.5), 2),\n  channel = sample(\n    c(\"email\", \"direct_mail\", \"digital\"),\n    n,\n    replace = TRUE,\n    prob = c(0.5, 0.3, 0.2)\n  ),\n  region = sample(\n    c(\"West\", \"South\", \"Midwest\", \"Northeast\"),\n    n,\n    replace = TRUE\n  ),\n  loyalty_tier = sample(\n    c(\"Bronze\", \"Silver\", \"Gold\", \"Platinum\"),\n    n,\n    replace = TRUE,\n    prob = c(0.4, 0.3, 0.2, 0.1)\n  ),\n  responded = rbinom(\n    n,\n    1,\n    prob = plogis(\n      -3 +\n        0.02 * (age - 45) +\n        0.3 * log(income / 50000) +\n        0.1 * freq_12mo -\n        0.005 * recency_days\n    )\n  )\n) |&gt;\n  mutate(\n    income = if_else(runif(n) &lt; 0.08, NA_real_, income),\n    avg_order_amt = if_else(runif(n) &lt; 0.05, NA_real_, avg_order_amt),\n    responded = factor(responded, levels = c(1, 0), labels = c(\"yes\", \"no\"))\n  )\n# introduce ~8 % missingness in income and avg_order_amt\n\nglimpse(mail_data)\n\n\nRows: 3,000\nColumns: 10\n$ customer_id   &lt;chr&gt; \"C00001\", \"C00002\", \"C00003\", \"C00004\", \"C00005\", \"C0000…\n$ age           &lt;dbl&gt; 38, 42, 64, 46, 47, 66, 51, 30, 37, 40, 60, 49, 50, 46, …\n$ income        &lt;dbl&gt; 44793, 40269, 20560, 32261, 233070, 47933, 84804, 43883,…\n$ recency_days  &lt;dbl&gt; 103, 102, 27, 115, 47, 106, 4, 62, 13, 21, 139, 100, 9, …\n$ freq_12mo     &lt;int&gt; 4, 3, 0, 3, 1, 3, 5, 2, 1, 6, 1, 3, 3, 3, 6, 1, 1, 1, 6,…\n$ avg_order_amt &lt;dbl&gt; 80.19, NA, 54.80, 46.49, 64.86, 78.43, 39.45, NA, 68.26,…\n$ channel       &lt;chr&gt; \"email\", \"digital\", \"digital\", \"email\", \"digital\", \"dire…\n$ region        &lt;chr&gt; \"West\", \"South\", \"Northeast\", \"Northeast\", \"Midwest\", \"W…\n$ loyalty_tier  &lt;chr&gt; \"Bronze\", \"Bronze\", \"Bronze\", \"Bronze\", \"Gold\", \"Silver\"…\n$ responded     &lt;fct&gt; no, no, yes, no, yes, yes, no, no, no, no, no, no, no, n…\n\n\n\n\nCode\nskim(mail_data)\n\n\n\nData summary\n\n\nName\nmail_data\n\n\nNumber of rows\n3000\n\n\nNumber of columns\n10\n\n\n_______________________\n\n\n\nColumn type frequency:\n\n\n\ncharacter\n4\n\n\nfactor\n1\n\n\nnumeric\n5\n\n\n________________________\n\n\n\nGroup variables\nNone\n\n\n\nVariable type: character\n\n\n\n\n\n\n\n\n\n\n\n\n\nskim_variable\nn_missing\ncomplete_rate\nmin\nmax\nempty\nn_unique\nwhitespace\n\n\n\n\ncustomer_id\n0\n1\n6\n6\n0\n3000\n0\n\n\nchannel\n0\n1\n5\n11\n0\n3\n0\n\n\nregion\n0\n1\n4\n9\n0\n4\n0\n\n\nloyalty_tier\n0\n1\n4\n8\n0\n4\n0\n\n\n\nVariable type: factor\n\n\n\n\n\n\n\n\n\n\n\nskim_variable\nn_missing\ncomplete_rate\nordered\nn_unique\ntop_counts\n\n\n\n\nresponded\n0\n1\nFALSE\n2\nno: 2858, yes: 142\n\n\n\nVariable type: numeric\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nskim_variable\nn_missing\ncomplete_rate\nmean\nsd\np0\np25\np50\np75\np100\nhist\n\n\n\n\nage\n0\n1.00\n45.16\n11.92\n8.00\n37.0\n45.00\n53.00\n86.00\n▁▅▇▃▁\n\n\nincome\n240\n0.92\n58349.86\n38521.39\n6924.00\n33242.0\n49331.50\n72438.50\n455628.00\n▇▁▁▁▁\n\n\nrecency_days\n0\n1.00\n60.25\n59.61\n0.00\n18.0\n42.00\n84.00\n515.00\n▇▂▁▁▁\n\n\nfreq_12mo\n0\n1.00\n2.94\n1.71\n0.00\n2.0\n3.00\n4.00\n10.00\n▇▇▂▁▁\n\n\navg_order_amt\n144\n0.95\n75.73\n40.24\n11.67\n47.5\n66.37\n94.71\n443.48\n▇▂▁▁▁\n\n\n\n\n\n\n\n3 Data Splitting\n\n\nCode\nmail_data |&gt;\n  count(responded) |&gt;\n  mutate(percent = n / sum(n))\n\n\n\n  \n\n\n\n\n\nCode\nset.seed(617)\nmail_split &lt;- initial_split(\n    mail_data,\n    prop = 0.8,\n    strata = responded\n)\n\n |&gt; mail_train &lt;- training(mail_split)\nmail_test &lt;- testing(mail_split)\n\n\nError in parse(text = input): &lt;text&gt;:8:2: unexpected '|&gt;'\n7: \n8:  |&gt;\n    ^\n\n\n\n\nCode\nbind_rows(\n  mail_train |&gt; count(responded) |&gt; mutate(set = \"train\"),\n  mail_test |&gt; count(responded) |&gt; mutate(set = \"test\")\n) |&gt;\n  group_by(set) |&gt;\n  mutate(percent = n / sum(n))\n\n\nError:\n! object 'mail_train' not found\n\n\n\n\n4 Build a Recipe\n\n\nCode\nrecipe(responded ~ ., data = mail_train) |&gt;\n  update_role(customer_id, new_role = \"ID\")\n\n\nError:\n! object 'mail_train' not found"
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html",
+    "href": "w02_ds_preprocessing.html",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "",
+    "text": "Learning Objectives\n  1 Setup\n  2 The Marketing Dataset\n  \n  2.1 Explaining how Income distribution changes from normal to logged data\n  \n  3 Data Splitting\n  \n  3.1 Why We Split\n  3.2 Stratified Random Split\n  3.3 ✏️ Exercise 3.1\n  \n  4 Building a Recipe\n  \n  4.1 Step-by-Step Construction\n  \n  4.1.1 What did we just build?\n  \n  4.2 Deep Dive: Each Step\n  \n  4.2.1 Imputation (step_impute_median)\n  4.2.2 Log Transformation (step_log)\n  4.2.3 Normalization (step_normalize)\n  4.2.4 Dummy Variables (step_dummy)\n  \n  \n  5 Preparing and Baking\n  6 Connecting the Recipe to a Model Workflow\n  \n  6.1 Regularization Concept\n  6.2 Fitting and Predicting\n  \n  7 Inspecting and Debugging a Recipe\n  8 Exercises\n  \n  8.1 ✏️ Exercise 8.1 — Alternative Imputation\n  8.2 ✏️ Exercise 8.2 — Different Encoding\n  8.3 ✏️ Exercise 8.3 — Interaction Term\n  8.4 ✏️ Exercise 8.4 — Remove a Step\n  8.5 ✏️ Exercise 8.5 — Stratification Check\n  8.6 ✏️ Exercise 8.6 — Data Leakage\n  8.7 ✏️ Exercise 8.7 — Inspecting a Recipe\n  8.8 ✏️ Exercise 8.8 — Variable Roles\n  \n  9 Summary"
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html#explaining-how-income-distribution-changes-from-normal-to-logged-data",
+    "href": "w02_ds_preprocessing.html#explaining-how-income-distribution-changes-from-normal-to-logged-data",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "2.1 Explaining how Income distribution changes from normal to logged data",
+    "text": "2.1 Explaining how Income distribution changes from normal to logged data\n\n\nCode\nlibrary(tidyverse)\nlibrary(patchwork)\n\nset.seed(42)\nn &lt;- 5000\nmeanlog &lt;- 10.8\nsdlog &lt;- 0.6\n\nincome &lt;- rlnorm(n, meanlog = meanlog, sdlog = sdlog)\nlog_income &lt;- log(income)\n\nmedian_raw &lt;- exp(meanlog)\nmean_raw &lt;- exp(meanlog + sdlog^2 / 2)\ngsd_low &lt;- median_raw / exp(sdlog)\ngsd_high &lt;- median_raw * exp(sdlog)\nlog_median &lt;- meanlog\nlog_mean &lt;- meanlog + sdlog^2 / 2\nlog_sd_low &lt;- meanlog - sdlog\nlog_sd_high &lt;- meanlog + sdlog\n\ndf_raw &lt;- tibble(income = income) |&gt; filter(income &lt; 250000)\ndf_log &lt;- tibble(log_income = log_income)\n\np1 &lt;- ggplot(df_raw, aes(x = income)) +\n  annotate(\n    \"rect\",\n    xmin = gsd_low,\n    xmax = gsd_high,\n    ymin = -Inf,\n    ymax = Inf,\n    fill = \"#97C459\",\n    alpha = 0.15\n  ) +\n  geom_histogram(\n    bins = 50,\n    fill = \"#85B7EB\",\n    color = \"#378ADD\",\n    linewidth = 0.3\n  ) +\n  geom_vline(aes(xintercept = median_raw, color = \"Median\"), linewidth = 1) +\n  geom_vline(\n    aes(xintercept = mean_raw, color = \"Mean\"),\n    linewidth = 1,\n    linetype = \"dashed\"\n  ) +\n  annotate(\n    \"text\",\n    x = median_raw - 1500,\n    y = Inf,\n    label = \"median\\n$49K\",\n    color = \"#E24B4A\",\n    vjust = 1.3,\n    hjust = 1,\n    size = 3\n  ) +\n  annotate(\n    \"text\",\n    x = mean_raw + 1500,\n    y = Inf,\n    label = \"mean\\n$59K\",\n    color = \"#BA7517\",\n    vjust = 1.3,\n    hjust = 0,\n    size = 3\n  ) +\n  scale_color_manual(values = c(\"Median\" = \"#E24B4A\", \"Mean\" = \"#BA7517\")) +\n  scale_x_continuous(\n    labels = scales::dollar_format(scale = 1e-3, suffix = \"K\")\n  ) +\n  labs(x = \"Income ($)\", y = \"Count\", title = \"Income (original scale)\") +\n  theme_minimal(base_size = 12) +\n  theme(\n    legend.position = \"none\",\n    plot.title = element_text(size = 11, face = \"bold\", color = \"gray40\")\n  )\n\np2 &lt;- ggplot(df_log, aes(x = log_income)) +\n  annotate(\n    \"rect\",\n    xmin = log_sd_low,\n    xmax = log_sd_high,\n    ymin = -Inf,\n    ymax = Inf,\n    fill = \"#97C459\",\n    alpha = 0.15\n  ) +\n  geom_histogram(\n    bins = 40,\n    fill = \"#85B7EB\",\n    color = \"#378ADD\",\n    linewidth = 0.3\n  ) +\n  geom_vline(aes(xintercept = log_median, color = \"Median\"), linewidth = 1) +\n  geom_vline(\n    aes(xintercept = log_mean, color = \"Mean\"),\n    linewidth = 1,\n    linetype = \"dashed\"\n  ) +\n  annotate(\n    \"text\",\n    x = log_median - 0.03,\n    y = Inf,\n    label = \"median\\n10.8\",\n    color = \"#E24B4A\",\n    vjust = 1.3,\n    hjust = 1,\n    size = 3\n  ) +\n  annotate(\n    \"text\",\n    x = log_mean + 0.03,\n    y = Inf,\n    label = \"mean\\n10.98\",\n    color = \"#BA7517\",\n    vjust = 1.3,\n    hjust = 0,\n    size = 3\n  ) +\n  scale_color_manual(values = c(\"Median\" = \"#E24B4A\", \"Mean\" = \"#BA7517\")) +\n  scale_x_continuous(breaks = seq(8, 14, by = 0.5)) +\n  labs(\n    x = \"log(income)\",\n    y = \"Count\",\n    title = \"log(income) — transformed scale\"\n  ) +\n  theme_minimal(base_size = 12) +\n  theme(\n    legend.position = \"none\",\n    plot.title = element_text(size = 11, face = \"bold\", color = \"gray40\")\n  )\n\np1 / p2\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nNoteLog-Normal Parameters: What Do They Mean?\n\n\n\nThe income variable was generated using a log-normal distribution via rlnorm(n, meanlog = 10.8, sdlog = 0.6). The parameters meanlog and sdlog describe the distribution of log(income) — not income itself. To recover interpretable statistics on the original dollar scale:\nMedian income (the “typical” earner): \\[\\text{Median} = e^{\\mu} = e^{10.8} \\approx \\$49{,}021\\]\nMean income (pulled up by high earners): \\[\\text{Mean} = e^{\\mu + \\sigma^2/2} = e^{10.8 + 0.18} \\approx \\$58{,}689\\]\nWhy are they different? Income is right-skewed — a small number of high earners pull the mean above the median. The median is preserved under exponentiation (the middle person stays the middle person), but the mean is not. The correction term \\(e^{\\sigma^2/2}\\) accounts for the skew introduced by the long right tail.\nStandard deviation on the dollar scale is less commonly reported for log-normal data. Instead, practitioners often describe spread using the geometric standard deviation (GSD): \\[\\text{GSD} = e^{\\sigma} = e^{0.6} \\approx 1.82\\]\nThis means a typical income is within a factor of 1.82 above or below the median — roughly between \\(\\$49{,}021 / 1.82 \\approx \\$26{,}935\\) and \\(\\$49{,}021 \\times 1.82 \\approx \\$89{,}218\\)."
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html#why-we-split",
+    "href": "w02_ds_preprocessing.html#why-we-split",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "3.1 Why We Split",
+    "text": "3.1 Why We Split\nThe test set simulates unseen future customers. Any transformation parameter (mean, standard deviation, imputation value) estimated on the full dataset “leaks” information about the test set into the model — this is called data leakage and leads to overly optimistic performance estimates.\nThe golden rule: fit everything on training data, apply to test data."
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html#stratified-random-split",
+    "href": "w02_ds_preprocessing.html#stratified-random-split",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "3.2 Stratified Random Split",
+    "text": "3.2 Stratified Random Split\n\n\nCode\nmail_data |&gt;\n  count(responded) |&gt;\n  mutate(percent = n / sum(n))\n\n\n\n  \n\n\n\nCode\nset.seed(617)\nmail_split &lt;- initial_split(\n  mail_data,\n  prop = 0.80, # 80 % train, 20 % test\n  strata = responded # preserve class balance in both sets\n)\n\nmail_train &lt;- training(mail_split)\nmail_test &lt;- testing(mail_split)\n\ncat(\"Training rows:\", nrow(mail_train), \"\\n\")\n\n\nTraining rows: 2400 \n\n\nCode\ncat(\"Test rows    :\", nrow(mail_test), \"\\n\")\n\n\nTest rows    : 600 \n\n\n\n\nCode\n# Verify class balance is preserved\nbind_rows(\n  mail_train |&gt; count(responded) |&gt; mutate(set = \"train\"),\n  mail_test |&gt; count(responded) |&gt; mutate(set = \"test\")\n) |&gt;\n  group_by(set) |&gt;\n  mutate(pct = n / sum(n) * 100)\n\n\n\n  \n\n\n\n\n\n\n\n\n\nTip\n\n\n\nMarketing note. Direct-mail response rates are typically 1–5 %. Stratification ensures the rare “yes” class is represented in both sets. Without it, a small test set might have almost no responders by chance."
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html#exercise-3.1",
+    "href": "w02_ds_preprocessing.html#exercise-3.1",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "3.3 ✏️ Exercise 3.1",
+    "text": "3.3 ✏️ Exercise 3.1\nChange prop to 0.70 and re-run the split. How many records move from training to test? How does the response rate change?\n\n\nCode\n# Your code here"
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html#step-by-step-construction",
+    "href": "w02_ds_preprocessing.html#step-by-step-construction",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "4.1 Step-by-Step Construction",
+    "text": "4.1 Step-by-Step Construction\n\n\nCode\nmail_rec &lt;- recipe(responded ~ ., data = mail_train) |&gt;\n\n  # ── Step 1: Remove ID column (not a predictor) ────────────────────────────\n  update_role(customer_id, new_role = \"ID\") |&gt;\n\n  # ── Step 2: Impute missing numeric values with the median ─────────────────\n  step_impute_median(all_numeric_predictors()) |&gt;\n\n  # ── Step 3: Log-transform right-skewed numeric predictors ─────────────────\n  step_log(income, avg_order_amt, recency_days, base = 10, offset = 1) |&gt;\n\n  # ── Step 4: Normalize (center + scale) all numeric predictors ─────────────\n  step_normalize(all_numeric_predictors()) |&gt;\n\n  # ── Step 5: Create dummy variables from nominal predictors ─────────────────\n  step_dummy(all_nominal_predictors()) |&gt;\n\n  # ── Step 6: Remove zero-variance predictors (safety net) ──────────────────\n  step_zv(all_predictors())\n\nmail_rec\n\n\n\n4.1.1 What did we just build?\n\n\nCode\nsummary(mail_rec) # variable roles"
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html#deep-dive-each-step",
+    "href": "w02_ds_preprocessing.html#deep-dive-each-step",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "4.2 Deep Dive: Each Step",
+    "text": "4.2 Deep Dive: Each Step\n\n4.2.1 Imputation (step_impute_median)\n\n\nCode\n# How much is missing?\nmail_train |&gt;\n  summarise(across(everything(), ~ mean(is.na(.)) * 100)) |&gt;\n  pivot_longer(\n    everything(),\n    names_to = \"variable\",\n    values_to = \"pct_missing\"\n  ) |&gt;\n  filter(pct_missing &gt; 0)\n\n\n\n  \n\n\n\n\n\n\n\n\n\nImportant\n\n\n\nWhy median and not mean? The median is robust to the same right-skew that makes these variables candidates for log transformation. Using the mean on a skewed distribution would impute an “average” that may not represent the typical customer.\n\n\n\n\n4.2.2 Log Transformation (step_log)\n\n\nCode\n# Visual: income before and after log10\np1 &lt;- mail_train |&gt;\n  filter(!is.na(income)) |&gt;\n  ggplot(aes(income)) +\n  geom_histogram(bins = 40, fill = \"steelblue\", alpha = 0.7) +\n  labs(title = \"Income — raw\", x = \"income ($)\")\n\np2 &lt;- mail_train |&gt;\n  filter(!is.na(income)) |&gt;\n  ggplot(aes(log10(income))) +\n  geom_histogram(bins = 40, fill = \"darkorange\", alpha = 0.7) +\n  labs(title = \"Income — log10\", x = \"log10(income)\")\n\nlibrary(patchwork)\np1 + p2\n\n\n\n\n\n\n\n\n\n\n\n4.2.3 Normalization (step_normalize)\nCentering and scaling puts all numeric variables on the same unit-free scale. This is required for distance-based models (KNN, SVM) and strongly recommended for logistic regression with regularization.\n\n\nCode\n# Prep just the first three steps to see the effect of normalization\nrec_partial &lt;- recipe(\n  responded ~ income + freq_12mo + age,\n  data = mail_train\n) |&gt;\n  step_impute_median(all_numeric_predictors()) |&gt;\n  step_log(income, base = 10, offset = 1) |&gt;\n  step_normalize(all_numeric_predictors())\n\nprep(rec_partial) |&gt;\n  bake(new_data = mail_train) |&gt;\n  summary()\n\n\n     income            freq_12mo             age           responded \n Min.   :-3.448174   Min.   :-1.72324   Min.   :-2.89068   yes: 111  \n 1st Qu.:-0.615244   1st Qu.:-0.55560   1st Qu.:-0.69877   no :2289  \n Median :-0.007824   Median : 0.02822   Median :-0.02434             \n Mean   : 0.000000   Mean   : 0.00000   Mean   : 0.00000             \n 3rd Qu.: 0.635022   3rd Qu.: 0.61204   3rd Qu.: 0.73439             \n Max.   : 3.920573   Max.   : 4.11495   Max.   : 3.43212             \n\n\n\n\n4.2.4 Dummy Variables (step_dummy)\n\n\nCode\n# Inspect how many dummies will be created\nmail_train |&gt;\n  select(channel, region, loyalty_tier) |&gt;\n  summarise(\n    channel_levels = n_distinct(channel),\n    region_levels = n_distinct(region),\n    loyalty_tier_levels = n_distinct(loyalty_tier)\n  )\n\n\n\n  \n\n\n\nstep_dummy() creates \\(k - 1\\) columns per factor (reference encoding) to avoid perfect multicollinearity."
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html#regularization-concept",
+    "href": "w02_ds_preprocessing.html#regularization-concept",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "6.1 Regularization Concept",
+    "text": "6.1 Regularization Concept\n\n\n\n\n\n\nNoteRegularization: Ridge, Lasso, and Elastic Net\n\n\n\n\nWhy Regularization?\nOrdinary logistic regression finds coefficients that best fit the training data. But with many predictors — common in marketing datasets with demographics, behavioral variables, and RFM features — the model can overfit: it learns the noise in the training data rather than the true signal, and performs poorly on new customers.\nRegularization fixes this by adding a penalty term to the loss function that discourages large coefficients. The model is forced to be simpler, which usually means it generalizes better to new data.\nThe penalized loss function looks like this:\n\\[\\text{Loss} = \\text{(fit to training data)} + \\lambda \\cdot \\text{(penalty on coefficients)}\\]\nThe \\(\\lambda\\) (penalty) parameter controls how hard we squeeze the coefficients:\n\n\\(\\lambda = 0\\): no regularization, ordinary logistic regression\nLarge \\(\\lambda\\): heavy shrinkage, very simple model\n\n\n\n\nThree Flavors of Regularization\n\nRidge (L2)\nRidge adds the sum of squared coefficients as the penalty:\n\\[\\text{Penalty} = \\sum_{j} \\beta_j^2\\]\nRidge shrinks all coefficients toward zero but never sets them exactly to zero. Every predictor stays in the model, just with a smaller influence. This works well when you believe most predictors are genuinely useful and want to reduce their magnitude without discarding any.\nIn tidymodels: mixture = 0\n\n\nLasso (L1)\nLasso adds the sum of absolute coefficients as the penalty:\n\\[\\text{Penalty} = \\sum_{j} |\\beta_j|\\]\nLasso can shrink coefficients all the way to exactly zero, effectively removing those predictors from the model. This makes Lasso a built-in variable selection tool — it produces a sparse model that only keeps the most important predictors. In a direct-mail context, this is useful when you have dozens of customer attributes and want the model to tell you which ones actually drive response.\nIn tidymodels: mixture = 1\n\n\nElastic Net\nElastic net blends Ridge and Lasso:\n\\[\\text{Penalty} = \\alpha \\sum_{j} |\\beta_j| + (1 - \\alpha) \\sum_{j} \\beta_j^2\\]\nThe mixture parameter (\\(\\alpha\\)) controls the blend:\n\n\n\nmixture\nBehavior\n\n\n\n\n1\nPure Lasso\n\n\n0\nPure Ridge\n\n\n0.5\nEqual blend of both\n\n\n\nElastic net is often the safest default when you are unsure: it can do variable selection like Lasso while handling correlated predictors more stably (Lasso tends to arbitrarily pick one variable from a correlated group; elastic net can keep both with reduced coefficients).\nIn tidymodels: 0 &lt; mixture &lt; 1\n\n\n\n\nChoosing \\(\\lambda\\)\nThe penalty value (\\(\\lambda\\)) is a hyperparameter — it is not learned from the data during model fitting. Instead, it must be chosen beforehand or tuned using cross-validation. A common workflow in tidymodels is to replace the fixed value with tune() and search over a grid of candidates:\nlr_spec &lt;- logistic_reg(penalty = tune(), mixture = 1) |&gt;\n  set_engine(\"glmnet\") |&gt;\n  set_mode(\"classification\")\nFor now, we use penalty = 0.01 as a reasonable starting value. Later in the course we will tune this properly.\n\n\n\nQuick Reference\n\n\n\n\n\n\n\n\n\nMethod\nPenalty type\nZeroes out predictors?\nBest when…\n\n\n\n\nRidge\nSum of squares\nNo\nMost predictors are useful\n\n\nLasso\nSum of absolutes\nYes\nMany irrelevant predictors\n\n\nElastic net\nBlend of both\nSometimes\nUnsure, or predictors are correlated"
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html#fitting-and-predicting",
+    "href": "w02_ds_preprocessing.html#fitting-and-predicting",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "6.2 Fitting and Predicting",
+    "text": "6.2 Fitting and Predicting\n\n\nCode\n# Fit on training data\nmail_fit &lt;- fit(mail_wf, data = mail_train)\n\n# Predict on test data\npreds &lt;- augment(mail_fit, new_data = mail_test)\npreds |&gt; select(customer_id, responded, .pred_class, .pred_yes) |&gt; head()\n\n\n\n  \n\n\n\n\n\nCode\n# Classification metrics\nmetrics &lt;- metric_set(accuracy, roc_auc, sens, spec)\n\npreds |&gt;\n  metrics(truth = responded, estimate = .pred_class, .pred_yes)"
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html#exercise-8.1-alternative-imputation",
+    "href": "w02_ds_preprocessing.html#exercise-8.1-alternative-imputation",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "8.1 ✏️ Exercise 8.1 — Alternative Imputation",
+    "text": "8.1 ✏️ Exercise 8.1 — Alternative Imputation\nReplace step_impute_median() with step_impute_mean(). Re-prep the recipe and compare the imputed values. Which would you prefer for income and why?\n\n\nCode\n# Your code here"
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html#exercise-8.2-different-encoding",
+    "href": "w02_ds_preprocessing.html#exercise-8.2-different-encoding",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "8.2 ✏️ Exercise 8.2 — Different Encoding",
+    "text": "8.2 ✏️ Exercise 8.2 — Different Encoding\nloyalty_tier is ordinal (Bronze &lt; Silver &lt; Gold &lt; Platinum). Replace step_dummy() with step_ordinalscore() for loyalty_tier only. Does this change the number of columns in the baked data?\n\n\nCode\n# Hint: use step_ordinalscore() from the recipes package\n# loyalty_tier is currently character. To be converted to ordinal scale, it must be an ordered factor first.\nmail_data &lt;- mail_data |&gt;\n  mutate(\n    loyalty_tier = factor(\n      loyalty_tier,\n      levels = c(\"Bronze\", \"Silver\", \"Gold\", \"Platinum\"),\n      ordered = TRUE\n    )\n  )\n# Your code here"
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html#exercise-8.3-interaction-term",
+    "href": "w02_ds_preprocessing.html#exercise-8.3-interaction-term",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "8.3 ✏️ Exercise 8.3 — Interaction Term",
+    "text": "8.3 ✏️ Exercise 8.3 — Interaction Term\nAdd an interaction between freq_12mo and log10(income) using step_interact(). What is the marketing intuition for this interaction?\n\n\nCode\n# Your code here"
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html#exercise-8.4-remove-a-step",
+    "href": "w02_ds_preprocessing.html#exercise-8.4-remove-a-step",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "8.4 ✏️ Exercise 8.4 — Remove a Step",
+    "text": "8.4 ✏️ Exercise 8.4 — Remove a Step\nRemove step_normalize() from the recipe, retrain the Lasso, and compare roc_auc before and after. What happens to model performance?\n\n\nCode\n# Your code here"
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html#exercise-8.5-stratification-check",
+    "href": "w02_ds_preprocessing.html#exercise-8.5-stratification-check",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "8.5 ✏️ Exercise 8.5 — Stratification Check",
+    "text": "8.5 ✏️ Exercise 8.5 — Stratification Check\nThe split used strata = responded. Remove stratification and re-split five times. Calculate the standard deviation of the response rate in the test sets. Does stratification reduce variance?\n\n\nCode\n# Your code here"
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html#exercise-8.6-data-leakage",
+    "href": "w02_ds_preprocessing.html#exercise-8.6-data-leakage",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "8.6 ✏️ Exercise 8.6 — Data Leakage",
+    "text": "8.6 ✏️ Exercise 8.6 — Data Leakage\nPrep the recipe correctly using mail_train, then bake mail_test. Next, incorrectly prep the same recipe using mail_test. Compare the normalization statistics for income. Why is the second approach considered data leakage?\n\n\nCode\n# Your code here"
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html#exercise-8.7-inspecting-a-recipe",
+    "href": "w02_ds_preprocessing.html#exercise-8.7-inspecting-a-recipe",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "8.7 ✏️ Exercise 8.7 — Inspecting a Recipe",
+    "text": "8.7 ✏️ Exercise 8.7 — Inspecting a Recipe\nUse tidy(mail_prep) to list the recipe steps. Then inspect the imputation values and normalization statistics using tidy(mail_prep, number = 1) and tidy(mail_prep, number = 3). What values were learned during prep()?\n\n\nCode\n# Your code here"
+  },
+  {
+    "objectID": "w02_ds_preprocessing.html#exercise-8.8-variable-roles",
+    "href": "w02_ds_preprocessing.html#exercise-8.8-variable-roles",
+    "title": "Week 2: Data Splitting and Preprocessing with recipes",
+    "section": "8.8 ✏️ Exercise 8.8 — Variable Roles",
+    "text": "8.8 ✏️ Exercise 8.8 — Variable Roles\nRemove update_role(customer_id, new_role = \"ID\") from the recipe and re-prep it. What happens to customer_id in the baked data? Why should an ID variable not be used as a predictor?\n\n\nCode\n# Your code here"
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Module 2 — Data Splitting & Preprocessing",
+    "section": "",
+    "text": "This module covers the foundations of preparing marketing data for machine learning: understanding the probabilistic tools behind classification models, splitting data in a principled way, building reusable preprocessing pipelines with recipes, and verifying that each transformation does what you intend. Work through the four pages below in the suggested order.\n\n\nSuggested order: Start with the Video Quiz to build conceptual foundations → review the Slides for a big-picture map → work through the Codebook for hands-on R practice → complete the Log Assignments to solidify the mathematics.\n\n\n\n  \n  \n    \n      Start here · Conceptual foundations\n      Video Quiz\n    \n    \n      \n        Test your understanding of four StatQuest videos that build the\n        mathematical foundation for logistic regression — from logarithms to\n        odds to classification models.\n      \n      \n        Key concepts & skills\n        \n          Logarithms — isolating exponents, base conversion, geometric mean\n          Odds vs. probability — converting between the two\n          Log(odds) / logit — symmetry and the real line\n          Odds ratios — effect size and direction\n          Significance tests — Fisher's exact, chi-square, Wald\n          Logistic vs. linear regression — S-curve, maximum likelihood\n          R: log(), exp(), plogis(), fisher.test(), chisq.test()\n        \n      \n      Open Video Quiz →\n    \n  \n\n  \n  \n    \n      Step 2 · Big-picture map\n      Slides\n    \n    \n      \n        A visual overview of the module's five stops — the dataset, the split,\n        the recipe, the workflow, and inspection — before diving into the full\n        codebook.\n      \n      \n        Key concepts & skills\n        \n          Why log-transform right-skewed variables (income)\n          The golden rule of data splitting — train vs. test\n          Stratified splitting for imbalanced outcomes\n          The six-step recipe() pipeline at a glance\n          Regularization — Ridge, Lasso, Elastic Net\n          Bundling recipe + model into a workflow()\n          Inspecting a prepped recipe with tidy()\n        \n      \n      Open Slides page →\n    \n  \n\n  \n  \n    \n      Step 3 · Hands-on R practice\n      Codebook\n    \n    \n      \n        The main hands-on notebook. Work through the direct-mail dataset from\n        raw data to a fitted Lasso logistic regression, with nine exercises\n        covering common pitfalls and extensions.\n      \n      \n        Key concepts & skills\n        \n          Log-normal income — understanding right skew visually\n          initial_split() with stratification\n          recipe() — declaring a preprocessing plan\n          step_impute_median(), step_log(), step_normalize()\n          step_dummy(), step_zv(), update_role()\n          prep() / bake() — learn vs. apply\n          workflow(), fit(), augment()\n          Data leakage — why prepping on test data is wrong\n          Variable roles — why ID columns must not be predictors\n        \n      \n      Open Codebook →\n    \n  \n\n  \n  \n    \n      Step 4 · Solidify the mathematics\n      Log Assignments\n    \n    \n      \n        Five focused assignments that verify your ability to perform log\n        transformations in R — converting between dollar and log scale,\n        back-transforming medians and means, and understanding why base\n        choice is irrelevant after normalization.\n      \n      \n        Key concepts & skills\n        \n          Dollar → log: log() and log10()\n          Log → dollar: exp() and 10^x\n          Log-normal median vs. mean — the σ²/2 correction\n          Geometric standard deviation — multiply/divide, not add/subtract\n          Empirical vs. theoretical values in real data\n          Base 10 vs. natural log — constant ratio, same result after step_normalize()\n          R: mutate(), summarise(), tibble()\n        \n      \n      Open Log Assignments →"
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html",
+    "href": "answers/w02_log_assignments_notes.html",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "",
+    "text": "Setup\n  1 Assignment L.1 — Dollar to Log\n  \n  1.1 Answer Key\n  1.2 What to Look For\n  1.3 Common Mistakes\n  \n  2 Assignment L.2 — Log Back to Dollar (Median and Mean)\n  \n  2.1 Answer Key\n  2.2 What to Look For\n  2.3 Common Mistakes\n  2.4 Discussion Point\n  \n  3 Assignment L.3 — Geometric Standard Deviation\n  \n  3.1 Answer Key\n  3.2 What to Look For\n  3.3 Common Mistakes\n  \n  4 Assignment L.4 — Confirm with Real Data\n  \n  4.1 Answer Key\n  4.2 What to Look For\n  4.3 Common Mistakes\n  4.4 Discussion Point\n  \n  5 Assignment L.5 — Base 10 vs. Natural Log\n  \n  5.1 Answer Key\n  5.2 What to Look For\n  5.3 Common Mistakes\n  \n  Quick Grading Reference"
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#answer-key",
+    "href": "answers/w02_log_assignments_notes.html#answer-key",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "1.1 Answer Key",
+    "text": "1.1 Answer Key\n\n\nCode\n# Natural log\nlog(233070)\n\n\n[1] 12.35909\n\n\nCode\n# Log base 10\nlog10(233070)\n\n\n[1] 5.367486\n\n\nCode\n# equivalently:\nlog(233070, base = 10)\n\n\n[1] 5.367486\n\n\nExpected answers:\n\nNatural log: ≈ 12.36\nLog base 10: ≈ 5.37\n\nWritten answer (Q4): Either base 10 or natural log is acceptable for the recipe — they differ only by a constant factor (log(10) ≈ 2.303), and step_normalize() absorbs that difference. The base = 10 choice is a convention for interpretability: log10 values map intuitively to order of magnitude ($10K → 4, $100K → 5, $1M → 6)."
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#what-to-look-for",
+    "href": "answers/w02_log_assignments_notes.html#what-to-look-for",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "1.2 What to Look For",
+    "text": "1.2 What to Look For\n\nBoth numeric answers correct ✓\nStudent recognizes the two results are proportional, not equal ✓\nWritten justification mentions either interpretability or that step_normalize() makes the base choice irrelevant for modeling ✓"
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#common-mistakes",
+    "href": "answers/w02_log_assignments_notes.html#common-mistakes",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "1.3 Common Mistakes",
+    "text": "1.3 Common Mistakes\n\nConfusing log() (natural) with log10() — watch for students who report the same number for both\nClaiming base 10 is “more accurate” — both bases are equally valid; correctness is about convention and interpretability"
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#answer-key-1",
+    "href": "answers/w02_log_assignments_notes.html#answer-key-1",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "2.1 Answer Key",
+    "text": "2.1 Answer Key\n\n\nCode\n# Median income\nexp(10.8)\n\n\n[1] 49020.8\n\n\nCode\n# Mean income — note the correction term sigma^2 / 2\nmu    &lt;- 10.8\nsigma &lt;- 0.6\nexp(mu + sigma^2 / 2)\n\n\n[1] 58688.55\n\n\nCode\n# Verify the formula directly\nexp(10.8 + 0.6^2 / 2)\n\n\n[1] 58688.55\n\n\nExpected answers:\n\nMedian: ≈ $49,021\nMean: ≈ $58,689 (some rounding acceptable: $58,670–$58,710)\n\nWritten answer (Q4): Income is right-skewed — a small number of very high earners pull the arithmetic mean upward. The median is the middle value and is preserved under the exp() transformation. The correction term \\(e^{\\sigma^2/2}\\) accounts for the asymmetric “stretching” that exponentiation applies to a symmetric log-scale distribution."
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#what-to-look-for-1",
+    "href": "answers/w02_log_assignments_notes.html#what-to-look-for-1",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "2.2 What to Look For",
+    "text": "2.2 What to Look For\n\nStudents must use exp(), not 10^x — both are valid mathematically (exp(10.8) = 10^(10.8/log(10))), but exp() is the correct inverse of the natural log used in rlnorm()\nThe correction term sigma^2 / 2 = 0.18 must be added before exp(), not multiplied after\nWritten explanation should mention skewness or outliers pulling the mean up"
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#common-mistakes-1",
+    "href": "answers/w02_log_assignments_notes.html#common-mistakes-1",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "2.3 Common Mistakes",
+    "text": "2.3 Common Mistakes\n\nUsing 10^10.8 instead of exp(10.8) — gives a different and incorrect answer (~630 billion) because the log base used in rlnorm() is natural\nForgetting the sigma^2/2 correction for the mean\nClaiming mean = median for income — the whole point is they differ"
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#discussion-point",
+    "href": "answers/w02_log_assignments_notes.html#discussion-point",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "2.4 Discussion Point",
+    "text": "2.4 Discussion Point\nAsk: “If a new customer has unknown income, which value would you use for imputation — the mean or median from the log scale — and why?” This connects directly to Exercise 8.1 in the main notebook (median vs. mean imputation)."
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#answer-key-2",
+    "href": "answers/w02_log_assignments_notes.html#answer-key-2",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "3.1 Answer Key",
+    "text": "3.1 Answer Key\n\n\nCode\n# GSD\ngsd &lt;- exp(0.6)\ngsd  # ≈ 1.822\n\n\n[1] 1.822119\n\n\nCode\n# Median income (from L.2)\nmedian_income &lt;- exp(10.8)  # ≈ 49,021\n\n# Typical range\nlower &lt;- median_income / gsd\nupper &lt;- median_income * gsd\n\ncat(\"GSD           :\", round(gsd, 3), \"\\n\")\n\n\nGSD           : 1.822 \n\n\nCode\ncat(\"Median income : $\", round(median_income), \"\\n\")\n\n\nMedian income : $ 49021 \n\n\nCode\ncat(\"Lower bound   : $\", round(lower), \"\\n\")\n\n\nLower bound   : $ 26903 \n\n\nCode\ncat(\"Upper bound   : $\", round(upper), \"\\n\")\n\n\nUpper bound   : $ 89322 \n\n\nExpected answers:\n\nGSD: ≈ 1.822\nLower: ≈ $26,908 (acceptable range: $26,800–$27,100)\nUpper: ≈ $89,301 (acceptable range: $89,000–$89,500)\n\nThese should match the green shaded band in the Week 2 notebook plot.\nWritten answer (Q4): A typical customer’s income falls between roughly $27K and $89K. Unlike the regular standard deviation (which adds and subtracts), the GSD multiplies and divides, reflecting that income variation is proportional, not additive. A marketer might use this to define a “mainstream income segment” for targeting."
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#what-to-look-for-2",
+    "href": "answers/w02_log_assignments_notes.html#what-to-look-for-2",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "3.2 What to Look For",
+    "text": "3.2 What to Look For\n\nGSD computed as exp(sdlog), not exp(meanlog) — common confusion\nRange uses multiplication/division, not addition/subtraction ✓\nValues roughly match the notebook’s green band ✓\nWritten interpretation is in plain English (dollars, not log units) ✓"
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#common-mistakes-2",
+    "href": "answers/w02_log_assignments_notes.html#common-mistakes-2",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "3.3 Common Mistakes",
+    "text": "3.3 Common Mistakes\n\nUsing exp(meanlog) instead of exp(sdlog) for GSD\nAdding/subtracting GSD instead of multiplying/dividing: 49021 - 1.822 vs. 49021 / 1.822 — the subtraction is meaningless"
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#answer-key-3",
+    "href": "answers/w02_log_assignments_notes.html#answer-key-3",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "4.1 Answer Key",
+    "text": "4.1 Answer Key\n\n\nCode\n# Step 1: empirical median and mean of income\nmail_data |&gt;\n  summarise(\n    median_income = median(income, na.rm = TRUE),\n    mean_income   = mean(income,   na.rm = TRUE)\n  )\n\n\n\n  \n\n\n\nCode\n# Step 2: create log_income, compute its median and mean\nmail_data |&gt;\n  mutate(log_income = log(income)) |&gt;\n  summarise(\n    median_log = median(log_income, na.rm = TRUE),\n    mean_log   = mean(log_income,   na.rm = TRUE)\n  )\n\n\n\n  \n\n\n\nCode\n# Step 3: back-transform\nlog_stats &lt;- mail_data |&gt;\n  mutate(log_income = log(income)) |&gt;\n  summarise(\n    median_log = median(log_income, na.rm = TRUE),\n    mean_log   = mean(log_income,   na.rm = TRUE)\n  )\n\ncat(\"exp(median log_income):\", round(exp(log_stats$median_log)), \"\\n\")\n\n\nexp(median log_income): 49331 \n\n\nCode\ncat(\"exp(mean log_income)  :\", round(exp(log_stats$mean_log)),   \"\\n\")\n\n\nexp(mean log_income)  : 48916 \n\n\nCode\ncat(\"Theoretical median    :\", round(exp(10.8)),                  \"\\n\")\n\n\nTheoretical median    : 49021 \n\n\nCode\ncat(\"Theoretical mean      :\", round(exp(10.8 + 0.6^2/2)),       \"\\n\")\n\n\nTheoretical mean      : 58689 \n\n\nExpected observations:\n\nEmpirical median of income ≈ $49,332 (close to theoretical $49,021)\nEmpirical mean of income ≈ $58,350 (close to theoretical $58,689)\nSmall differences are expected due to finite sampling (n = 3,000) and the 8% missingness in income\nexp(median(log_income)) recovers a value close to the theoretical median — the geometric mean of income\nexp(mean(log_income)) is close to but not exactly the arithmetic mean of income — it is the geometric mean on the log scale"
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#what-to-look-for-3",
+    "href": "answers/w02_log_assignments_notes.html#what-to-look-for-3",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "4.2 What to Look For",
+    "text": "4.2 What to Look For\n\nStudent uses na.rm = TRUE — without it the result is NA ✓\nDifferences between theoretical and empirical values explained by finite sampling, not a code error ✓\nStudent recognizes exp(mean(log_income)) ≠ mean(income) — a conceptually important distinction ✓"
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#common-mistakes-3",
+    "href": "answers/w02_log_assignments_notes.html#common-mistakes-3",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "4.3 Common Mistakes",
+    "text": "4.3 Common Mistakes\n\nForgetting na.rm = TRUE\nExpecting exact match to theoretical values and concluding the code is wrong\nConfusing geometric mean (exp(mean(log(x)))) with arithmetic mean"
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#discussion-point-1",
+    "href": "answers/w02_log_assignments_notes.html#discussion-point-1",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "4.4 Discussion Point",
+    "text": "4.4 Discussion Point\nThis exercise plants a seed for Week 3’s resampling discussion: “A single sample of 3,000 gives slightly different statistics than the population parameters. What does that imply about how much we should trust a model trained on one particular sample?”"
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#answer-key-4",
+    "href": "answers/w02_log_assignments_notes.html#answer-key-4",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "5.1 Answer Key",
+    "text": "5.1 Answer Key\n\n\nCode\n# Step 1 & 2: build the tibble\nresult &lt;- tibble(\n  income = c(10000, 100000, 1000000)\n) |&gt;\n  mutate(\n    log_natural = log(income),\n    log_base10  = log10(income)\n  )\nresult\n\n\n\n  \n\n\n\nCode\n# Step 3: compute the ratio\nresult |&gt;\n  mutate(ratio = log_natural / log_base10)\n\n\n\n  \n\n\n\nCode\n# The constant is log(10)\nlog(10)\n\n\n[1] 2.302585\n\n\nExpected answers:\n\n\n\nincome\nlog_natural\nlog_base10\nratio\n\n\n\n\n10,000\n9.210\n4\n2.303\n\n\n100,000\n11.513\n5\n2.303\n\n\n1,000,000\n13.816\n6\n2.303\n\n\n\nThe ratio is always log(10) ≈ 2.303.\nWritten answer (Q4): Since natural log = log10 × log(10), the two columns are related by a constant multiplier. step_normalize() centers by the mean and divides by the standard deviation — both operations absorb any constant multiplier, leaving the normalized values identical regardless of which base was used. So the choice of base is a cosmetic preference, not a modeling decision."
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#what-to-look-for-4",
+    "href": "answers/w02_log_assignments_notes.html#what-to-look-for-4",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "5.2 What to Look For",
+    "text": "5.2 What to Look For\n\nRatio is constant across all three rows ✓\nStudent identifies the constant as log(10) ≈ 2.303 ✓\nWritten explanation correctly invokes step_normalize() as the reason base doesn’t matter ✓\nLog base 10 values are exact integers (4, 5, 6) — a nice sanity check ✓"
+  },
+  {
+    "objectID": "answers/w02_log_assignments_notes.html#common-mistakes-4",
+    "href": "answers/w02_log_assignments_notes.html#common-mistakes-4",
+    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
+    "section": "5.3 Common Mistakes",
+    "text": "5.3 Common Mistakes\n\nDividing in the wrong direction (log10 / log_natural) — gives 1/2.303 ≈ 0.434 = log10(e), which is also correct but less intuitive\nClaiming base 10 is “better” without referencing normalization\nNot noticing that log10 of powers of 10 are exact integers"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "",
+    "text": "Setup\n  1 Exercise 3.1 — Stratification Check\n  \n  1.1 Answer Key\n  1.2 What to Look For\n  1.3 Discussion Point\n  \n  2 Exercise 8.1 — Alternative Imputation\n  \n  2.1 Answer Key\n  2.2 What to Look For\n  2.3 Discussion Point\n  \n  3 Exercise 8.2 — Different Encoding\n  \n  3.1 Answer Key\n  3.2 What to Look For\n  \n  4 Exercise 8.3 — Interaction Term\n  \n  4.1 Answer Key\n  4.2 What to Look For\n  4.3 Discussion Point\n  \n  5 Exercise 8.4 — Remove a Step\n  \n  5.1 Answer Key\n  5.2 What to Look For\n  5.3 Discussion Point\n  \n  6 Exercise 8.5 — Stratification Check\n  \n  6.1 Answer Key\n  6.2 What to Look For\n  6.3 Discussion Point\n  \n  7 Exercise 8.6 — Data Leakage\n  \n  7.1 Answer Key\n  7.2 What to Look For\n  7.3 Discussion Point\n  \n  8 Exercise 8.7 — Inspecting a Recipe\n  \n  8.1 Answer Key\n  8.2 What to Look For\n  8.3 Discussion Point\n  \n  9 Exercise 8.8 — Variable Roles\n  \n  9.1 Answer Key\n  9.2 What to Look For\n  9.3 Discussion Point\n  \n  Quick Grading Reference"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "1.1 Answer Key",
+    "text": "1.1 Answer Key\n\n\nCode\nset.seed(617)\nsplit_70 &lt;- initial_split(mail_data, prop = 0.70, strata = responded)\ntrain_70 &lt;- training(split_70)\ntest_70 &lt;- testing(split_70)\n\ncat(\"80/20 split — train:\", nrow(mail_train), \"| test:\", nrow(mail_test), \"\\n\")\n\n\n80/20 split — train: 2400 | test: 600 \n\n\nCode\ncat(\"70/30 split — train:\", nrow(train_70), \"| test:\", nrow(test_70), \"\\n\")\n\n\n70/30 split — train: 2100 | test: 900 \n\n\nCode\ncat(\"Records moved to test:\", nrow(test_70) - nrow(mail_test), \"\\n\\n\")\n\n\nRecords moved to test: 300 \n\n\nCode\n# Response rates\nbind_rows(\n  mail_train |&gt;\n    summarise(split = \"80/20 train\", pct_yes = mean(responded == \"yes\") * 100),\n  mail_test |&gt;\n    summarise(split = \"80/20 test\", pct_yes = mean(responded == \"yes\") * 100),\n  train_70 |&gt;\n    summarise(split = \"70/30 train\", pct_yes = mean(responded == \"yes\") * 100),\n  test_70 |&gt;\n    summarise(split = \"70/30 test\", pct_yes = mean(responded == \"yes\") * 100)\n)"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "1.2 What to Look For",
+    "text": "1.2 What to Look For\n\nRecords moved: 300 rows shift from training to test (from 2,400/600 to 2,100/900)\nResponse rate: Should stay approximately ~4.7% in both sets — that’s exactly what strata = responded guarantees. If students see large differences, they may have removed the strata argument by mistake.\nCommon mistake: Students may confuse prop (training proportion) with test proportion. A good follow-up question: “If prop = 0.70, what fraction is the test set?”"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#discussion-point",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#discussion-point",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "1.3 Discussion Point",
+    "text": "1.3 Discussion Point\n\nA 70/30 split gives a larger test set — useful for getting more stable performance estimates, but at the cost of a smaller training set.\nWith only 3,000 rows and a 4.7% response rate, the training set contains only ~98 responders at 70/30 — already quite few for a classification model.\n\n\n\nCode\ntrain_70 |&gt; count(responded)\n\n\n\n  \n\n\n\nCode\n0.0433 * 2100\n\n\n[1] 90.93"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key-1",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key-1",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "2.1 Answer Key",
+    "text": "2.1 Answer Key\n\n\nCode\nrec_mean &lt;- recipe(responded ~ ., data = mail_train) |&gt;\n  update_role(customer_id, new_role = \"ID\") |&gt;\n  step_impute_mean(all_numeric_predictors()) |&gt; # &lt;-- changed\n  step_log(income, avg_order_amt, recency_days, base = 10, offset = 1) |&gt;\n  step_normalize(all_numeric_predictors()) |&gt;\n  step_dummy(all_nominal_predictors()) |&gt;\n  step_zv(all_predictors())\n\nprep_mean &lt;- prep(rec_mean)\nprep_median &lt;- mail_prep\n\n# Compare imputed values for income and avg_order_amt\nbind_rows(\n  tidy(prep_median, number = 1) |&gt; mutate(method = \"median\"),\n  tidy(prep_mean, number = 1) |&gt; mutate(method = \"mean\")\n) |&gt;\n  filter(terms %in% c(\"income\", \"avg_order_amt\")) |&gt;\n  arrange(terms, method)"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for-1",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for-1",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "2.2 What to Look For",
+    "text": "2.2 What to Look For\n\nMean income imputation will be noticeably higher than median (~$58K vs ~$49K) because of right-skew. The few very high earners drag the mean up.\nMean imputation assigns a value that is above the 50th percentile — most customers with missing income would be assumed to earn more than half the observed customers. That’s not a neutral assumption.\nPreferred: median, because it is robust to the right-skew in income and avg_order_amt."
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#discussion-point-1",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#discussion-point-1",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "2.3 Discussion Point",
+    "text": "2.3 Discussion Point\nThis is a good opportunity to reinforce that imputation choice is a design decision with business implications — imputing a higher income could inflate predicted response probabilities for customers whose income we don’t know. Median is the safer, more conservative choice."
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key-2",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key-2",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "3.1 Answer Key",
+    "text": "3.1 Answer Key\n\n\nCode\n# loyalty_tier must be an ordered factor first\nmail_data_ord &lt;- mail_data |&gt;\n  mutate(\n    loyalty_tier = factor(\n      loyalty_tier,\n      levels = c(\"Bronze\", \"Silver\", \"Gold\", \"Platinum\"),\n      ordered = TRUE\n    )\n  )\n\nmail_train_ord &lt;- mail_data_ord |&gt; slice(mail_split$in_id)\n\nrec_ordinal &lt;- recipe(responded ~ ., data = mail_train_ord) |&gt;\n  update_role(customer_id, new_role = \"ID\") |&gt;\n  step_impute_median(all_numeric_predictors()) |&gt;\n  step_log(income, avg_order_amt, recency_days, base = 10, offset = 1) |&gt;\n  step_normalize(all_numeric_predictors()) |&gt;\n  step_ordinalscore(loyalty_tier) |&gt; # ordinal score for tier\n  step_dummy(all_nominal_predictors()) |&gt; # dummy for channel + region\n  step_zv(all_predictors())\n\nprep_ord &lt;- prep(rec_ordinal)\nbaked_orig &lt;- bake(mail_prep, new_data = NULL)\nbaked_ord &lt;- bake(prep_ord, new_data = NULL)\n\ncat(\"Original columns (dummy encoding):  \", ncol(baked_orig), \"\\n\")\n\n\nOriginal columns (dummy encoding):   15 \n\n\nCode\ncat(\"Ordinal encoding columns:           \", ncol(baked_ord), \"\\n\")\n\n\nOrdinal encoding columns:            13 \n\n\nCode\n# Inspect what loyalty_tier looks like now\nbaked_ord |&gt; select(starts_with(\"loyalty\")) |&gt; head()\n\n\n\n  \n\n\n\nCode\nbaked_orig |&gt; select(starts_with(\"loyalty\")) |&gt; head()"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for-2",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for-2",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "3.2 What to Look For",
+    "text": "3.2 What to Look For\n\nColumn count drops by 2:\n\ndummy encoding creates 3 columns for loyalty_tier (k − 1 = 4 − 1 = 3);\nordinal scoring creates just 1 integer column (Bronze=1, Silver=2, Gold=3, Platinum=4).\n\nWatch for the error:\n\nif students run step_ordinalscore() without first converting loyalty_tier to an ordered factor, R will throw: “Ordinal factor variables should be selected as inputs into this step.” The fix is to add mutate() or step_mutate() before step_ordinalscore().\n\nKey teaching point:\n\nordinal encoding assumes equal spacing between tiers\n\nBronze→Silver = Silver→Gold = Gold→Platinum.\n\nThat may not be true. Custom spacing can be applied via the convert argument."
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key-3",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key-3",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "4.1 Answer Key",
+    "text": "4.1 Answer Key\n\n\nCode\nrec_interact &lt;- recipe(responded ~ ., data = mail_train) |&gt;\n  update_role(customer_id, new_role = \"ID\") |&gt;\n  step_impute_median(all_numeric_predictors()) |&gt;\n  step_log(income, avg_order_amt, recency_days, base = 10, offset = 1) |&gt;\n  step_normalize(all_numeric_predictors()) |&gt;\n  step_interact(terms = ~ freq_12mo:income) |&gt; # interaction after normalize\n  step_dummy(all_nominal_predictors()) |&gt;\n  step_zv(all_predictors())\n\nprep_int &lt;- prep(rec_interact)\nbaked_int &lt;- bake(prep_int, new_data = NULL)\n\n# Confirm the interaction column was created\nbaked_int |&gt; select(freq_12mo, income, starts_with(\"freq_12mo_x\")) |&gt; head()"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for-3",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for-3",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "4.2 What to Look For",
+    "text": "4.2 What to Look For\n\nA new column freq_12mo_x_income should appear in the baked data.\nStep order matters: step_interact() must come after step_normalize()\n\nstudents who put it before normalization will get the interaction of unstandardized variables, which can lead to scaling issues.\n\nMarketing intuition: high purchase frequency + high income may have a multiplicative effect on response — a very frequent, affluent customer is not just the sum of “frequent” and “rich,” they may be disproportionately likely to respond. Conversely, a high-frequency, low-income customer might be budget-sensitive, dampening the frequency effect."
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#discussion-point-2",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#discussion-point-2",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "4.3 Discussion Point",
+    "text": "4.3 Discussion Point\nInteraction terms increase model complexity and can hurt regularized models if not needed. A good follow-up: “After adding this interaction, does roc_auc improve? If not, should we keep it?”"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key-4",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key-4",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "5.1 Answer Key",
+    "text": "5.1 Answer Key\n\n\nCode\nrec_no_norm &lt;- recipe(responded ~ ., data = mail_train) |&gt;\n  update_role(customer_id, new_role = \"ID\") |&gt;\n  step_impute_median(all_numeric_predictors()) |&gt;\n  step_log(income, avg_order_amt, recency_days, base = 10, offset = 1) |&gt;\n  # step_normalize() removed\n  step_dummy(all_nominal_predictors()) |&gt;\n  step_zv(all_predictors())\n\nwf_no_norm &lt;- workflow() |&gt;\n  add_recipe(rec_no_norm) |&gt;\n  add_model(lr_spec)\n\nfit_no_norm &lt;- fit(wf_no_norm, data = mail_train)\npreds_no_norm &lt;- augment(fit_no_norm, new_data = mail_test)\n\nbind_rows(\n  preds |&gt;\n    roc_auc(truth = responded, .pred_yes) |&gt;\n    mutate(model = \"with normalize\"),\n  preds_no_norm |&gt;\n    roc_auc(truth = responded, .pred_yes) |&gt;\n    mutate(model = \"without normalize\")\n) |&gt;\n  select(model, .estimate)"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for-4",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for-4",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "5.2 What to Look For",
+    "text": "5.2 What to Look For\n\nPerformance typically drops noticeably without normalization for Lasso, because the penalty is applied equally to all coefficients in their raw units. Without normalization, predictors on larger scales (income in tens of thousands of dollars) get penalized proportionally more than predictors on smaller scales (freq_12mo, which ranges 0–10), distorting variable selection.\nStudents may be surprised that log transformation alone isn’t enough — log(income) is still on a very different scale than freq_12mo."
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#discussion-point-3",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#discussion-point-3",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "5.3 Discussion Point",
+    "text": "5.3 Discussion Point\n\nThis exercise makes the practical consequence of normalization visible rather than just stating it as a rule.\nA useful follow-up: “For a tree-based model like random forest, would removing normalization matter?” (Answer: no — trees split on rank order, not magnitude.)"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key-5",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key-5",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "6.1 Answer Key",
+    "text": "6.1 Answer Key\n\n\nCode\n# Amplify the effect: use only 100 rows to make sampling variation more visible\nsmall_data &lt;- mail_data |&gt; slice_sample(n = 100)\n\nunstrat_small &lt;- map_dbl(1:100, function(s) {\n  set.seed(s)\n  sp &lt;- initial_split(small_data, prop = 0.80)\n  mean(testing(sp)$responded == \"yes\")\n})\n\nstrat_small &lt;- map_dbl(1:100, function(s) {\n  set.seed(s)\n  sp &lt;- initial_split(small_data, prop = 0.80, strata = responded)\n  mean(testing(sp)$responded == \"yes\")\n})\n\n# Compare\ntibble(\n  type = c(rep(\"unstratified\", 100), rep(\"stratified\", 100)),\n  rate = c(unstrat_small, strat_small)\n) |&gt;\n  group_by(type) |&gt;\n  summarise(\n    mean = mean(rate),\n    sd = sd(rate),\n    min = min(rate),\n    max = max(rate)\n  )"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for-5",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for-5",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "6.2 What to Look For",
+    "text": "6.2 What to Look For\n\nThe standard deviation of response rate across splits should be notably smaller with stratification (~0.0 with strata, vs potentially 0.3–0.8% without).\nWith only 142 responders in 3,000 rows, a 600-row test set contains only ~28 expected responders. Random variation in that small count creates meaningful swings in response rate without stratification."
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#discussion-point-4",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#discussion-point-4",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "6.3 Discussion Point",
+    "text": "6.3 Discussion Point\nThis exercise provides empirical evidence for something students may have accepted on faith. The fact that stratification nearly eliminates response rate variance across splits is a concrete, memorable result."
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key-6",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key-6",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "7.1 Answer Key",
+    "text": "7.1 Answer Key\n\n\nCode\n# Correct: prep on training\nprep_train &lt;- prep(mail_rec)\nnorm_train &lt;- tidy(prep_train, number = 3) |&gt;\n  filter(terms == \"income\") |&gt;\n  select(terms, statistic, value) |&gt;\n  mutate(source = \"correct (prep on train)\")\n\n# Incorrect: prep on test (data leakage)\nprep_test &lt;- prep(mail_rec, training = mail_test)\nnorm_test &lt;- tidy(prep_test, number = 3) |&gt;\n  filter(terms == \"income\") |&gt;\n  select(terms, statistic, value) |&gt;\n  mutate(source = \"leakage (prep on test)\")\n\nbind_rows(norm_train, norm_test) |&gt;\n  pivot_wider(names_from = source, values_from = value)"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for-6",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for-6",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "7.2 What to Look For",
+    "text": "7.2 What to Look For\n\nThe mean and standard deviation of income will differ slightly between the two preps, because the training set (2,400 rows) and test set (600 rows) are different samples with slightly different statistics.\nEven small differences matter: if test-set statistics are used to normalize, then the model has implicitly “seen” the test set during preprocessing — making performance estimates optimistic.\nKey point: this kind of leakage is insidious because the code runs without errors and the performance difference is usually small — but it’s conceptually wrong and can mislead model selection."
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#discussion-point-5",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#discussion-point-5",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "7.3 Discussion Point",
+    "text": "7.3 Discussion Point\n“Would this matter more with a small or large dataset, and why?” (Answer: more with small data, where training and test statistics diverge more.)"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key-7",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key-7",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "8.1 Answer Key",
+    "text": "8.1 Answer Key\n\n\nCode\n# Step index\ntidy(mail_prep)\n\n\n\n  \n\n\n\nCode\n# Imputation values (step 1)\ntidy(mail_prep, number = 1)\n\n\n\n  \n\n\n\nCode\nmail_train_median &lt;- median(mail_train$income, na.rm = TRUE) # 48898.5\nmail_train |&gt; summarize(median = median(avg_order_amt, na.rm = TRUE))\n\n\n\n  \n\n\n\nCode\n# Normalization statistics (step 3 — after log transform)\ntidy(mail_prep, number = 3) |&gt; arrange(terms)\n\n\n\n  \n\n\n\nCode\n# log transform\ntidy(mail_prep, number = 2)\n\n\n\n  \n\n\n\nCode\n# from all data (n = 3000)\nexp(10.8) # 49020.8\n\n\n[1] 49020.8\n\n\nCode\nexp(0.6) # 1.822119\n\n\n[1] 1.822119\n\n\nCode\nlog10(exp(10.8)) # 4.69038\n\n\n[1] 4.69038\n\n\nCode\nlog10(exp(0.6)) # 0.2605767\n\n\n[1] 0.2605767\n\n\nCode\n# From mail_train data (n = 2400)\nmail_train |&gt;\n  mutate(income = replace_na(income, median(income, na.rm = TRUE))) |&gt;\n  mutate(income = log10(income)) |&gt;\n  summarise(mean_log10 = mean(income), sd_log10 = sd(income)) #base 10\n\n\n\n  \n\n\n\nCode\nmail_train |&gt;\n  mutate(income = replace_na(income, median(income, na.rm = TRUE))) |&gt;\n  mutate(income = log(income)) |&gt;\n  summarise(mean_log = mean(income), sd_log = sd(income)) # natural log"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for-7",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for-7",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "8.2 What to Look For",
+    "text": "8.2 What to Look For\n\nStep 1 (imputation): median values for income (~$49K on raw scale, before log) and avg_order_amt (~$66).\n\nThese should match median(mail_train$income, na.rm = TRUE) and median(mail_train$avg_order_amt, na.rm = TRUE).\n\nStep 3 (normalization):\n\n\n8.2.0.1 What step_normalize() does — Z-score standardization\n\\[\nz = \\frac{x - \\mu}{\\sigma}\n\\]\nWhere:\n\nx = the original value\nμ = the mean of that variable (computed from training data during prep())\nσ = the standard deviation of that variable (computed from training data during prep())\nz = the resulting standardized value\nmeans and standard deviations — after log transformation, so these are on the log scale. income mean ≈ 10.8, sd ≈ 0.6 (matching meanlog / sdlog from the data generator, which is a nice sanity check).\nOnce normalzied, the data should have mean = 0 with sd = 1.\n\n\n\nCode\nbake(mail_prep, new_data = NULL) |&gt;\n  summarize(mean = mean(income), sd = sd(income))\n\n\n\n  \n\n\n\n\nStudents should notice that number = 3 refers to the third step in the recipe, not a fixed step type — if they reorder steps, the numbering changes."
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#discussion-point-6",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#discussion-point-6",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "8.3 Discussion Point",
+    "text": "8.3 Discussion Point\ntidy() on a prepped recipe is a powerful debugging tool. Ask students: “How would you use this to check whether preprocessing produced something unexpected?”"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key-8",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#answer-key-8",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "9.1 Answer Key",
+    "text": "9.1 Answer Key\n\n\nCode\nrec_no_role &lt;- recipe(responded ~ ., data = mail_train) |&gt;\n  # update_role() removed\n  step_impute_median(all_numeric_predictors()) |&gt;\n  step_log(income, avg_order_amt, recency_days, base = 10, offset = 1) |&gt;\n  step_normalize(all_numeric_predictors()) |&gt;\n  step_dummy(all_nominal_predictors()) |&gt;\n  step_zv(all_predictors())\n\nprep_no_role &lt;- prep(rec_no_role)\nbaked_no_role &lt;- bake(prep_no_role, new_data = NULL)\n\ncat(\n  \"With update_role()    — columns:\",\n  ncol(bake(mail_prep, new_data = NULL)),\n  \"\\n\"\n)\n\n\nWith update_role()    — columns: 15 \n\n\nCode\ncat(\"Without update_role() — columns:\", ncol(baked_no_role), \"\\n\")\n\n\nWithout update_role() — columns: 2413 \n\n\nCode\n# Is customer_id still in the baked data?\n\"customer_id\" %in% names(baked_no_role)\n\n\n[1] FALSE\n\n\nCode\n# What type did it become?\nbaked_no_role |&gt; select(starts_with(\"customer\")) |&gt; head()"
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for-8",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#what-to-look-for-8",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "9.2 What to Look For",
+    "text": "9.2 What to Look For\n\nWithout update_role(), customer_id is treated as a regular predictor. Because it is a character variable, step_dummy() will try to create dummy variables from it — 3,000 unique IDs means up to 2,999 dummy columns, most of which step_zv() will then remove as zero-variance columns.\nThe column count will balloon dramatically before step_zv() cleans it up — worth showing students what happens before that safety net is applied.\nWhy ID variables must not be predictors: each customer ID is unique, so the model could perfectly memorize training labels by ID. It would score 100% on training data and near-random on test data — classic overfitting with a degenerate cause."
+  },
+  {
+    "objectID": "answers/w02_ds_preprocessing_Exercise-Review.html#discussion-point-7",
+    "href": "answers/w02_ds_preprocessing_Exercise-Review.html#discussion-point-7",
+    "title": "Week 2 Exercises — Teacher’s Notes",
+    "section": "9.3 Discussion Point",
+    "text": "9.3 Discussion Point\nThis is a memorable example of a silent error — the code runs fine, the model fits, but the results are meaningless. Ask students: “How would you detect this in practice without looking at the code?” (Answer: suspiciously high training accuracy, near-chance test accuracy.)"
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html",
+    "href": "answers/w02_video_quiz_notes.html",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "",
+    "text": "Setup\n  1 Step 1-1 — Logarithms\n  \n  1.1 Q1 — What Does a Log Do?\n  1.2 Q2 — Multiplication Becomes Addition\n  1.3 Q3 — Geometric Mean in Marketing\n  1.4 Q4 — Log(0) and the Offset\n  1.5 Q5 — Base Conversion\n  \n  2 Step 1-2 — Odds and Log(Odds)\n  \n  2.1 Q6 — Probability vs. Odds\n  2.2 Q7 — Converting Between Probability and Odds\n  2.3 Q8 — Why Log(Odds)?\n  2.4 Q9 — The Logit Function\n  2.5 Q10 — Log(Odds) and the Normal Distribution\n  \n  3 Step 1-3 — Odds Ratios and Log(Odds Ratios)\n  \n  3.1 Q11 — What Is an Odds Ratio?\n  3.2 Q12 — Asymmetry and Log(Odds Ratio)\n  3.3 Q13 — Effect Size Interpretation\n  3.4 Q14 — Fisher’s Exact Test\n  3.5 Q15 — Chi-Square Test\n  3.6 Q16 — Wald Test Concept\n  3.7 Q17 — Connecting Odds Ratios to the Course\n  \n  4 Step 2-1 — Logistic Regression\n  \n  4.1 Q18 — Linear vs. Logistic Regression\n  4.2 Q19 — The S-Shaped Logistic Curve\n  4.3 Q20 — Maximum Likelihood vs. Least Squares\n  4.4 Q21 — Predicting Probability vs. Class\n  4.5 Q22 — Wald’s Test and Variable Selection\n  4.6 Q23 — Synthesis: From Logs to Logistic Regression\n  \n  Quick Grading Reference"
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q1-what-does-a-log-do",
+    "href": "answers/w02_video_quiz_notes.html#q1-what-does-a-log-do",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "1.1 Q1 — What Does a Log Do?",
+    "text": "1.1 Q1 — What Does a Log Do?\n\n\nCode\nlog(32, base = 2)\n\n\n[1] 5\n\n\nExpected answer: 5\nComplete statement: “If \\(2^5 = 32\\), then \\(\\log_2(32) = 5\\) because the logarithm tells us the exponent we need to raise 2 to in order to get 32.”\nQ3 written answer: Income ranges from ~$7K to ~$455K — a ratio of about 65×. On the raw scale that spread makes linear modeling difficult. Log compresses it to a much narrower range (~3.8 to ~5.7 in log10), making the relationship between income and response more linear.\nCommon mistake: Answering “5” without explaining why that’s what a log does — push for the “isolates the exponent” framing from the video."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q2-multiplication-becomes-addition",
+    "href": "answers/w02_video_quiz_notes.html#q2-multiplication-becomes-addition",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "1.2 Q2 — Multiplication Becomes Addition",
+    "text": "1.2 Q2 — Multiplication Becomes Addition\n\n\nCode\nlog(4 * 8, base = 2)\n\n\n[1] 5\n\n\nCode\nlog(4, base = 2) + log(8, base = 2)\n\n\n[1] 5\n\n\nExpected answer: Both equal 5 — confirming the rule.\nWritten answer (Q2): When multiplying many small probabilities (e.g., likelihoods), the product can underflow to zero in floating-point arithmetic. Log converts multiplication to addition, keeping the numbers in a stable numeric range — this is why the log-likelihood is maximized instead of the likelihood directly.\nCommon mistake: Students who just report the numbers without explaining the computational benefit should be pushed to connect it to likelihood in logistic regression."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q3-geometric-mean-in-marketing",
+    "href": "answers/w02_video_quiz_notes.html#q3-geometric-mean-in-marketing",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "1.3 Q3 — Geometric Mean in Marketing",
+    "text": "1.3 Q3 — Geometric Mean in Marketing\n\n\nCode\norders &lt;- c(10, 20, 80, 40, 1000)\nmean(orders)\n\n\n[1] 230\n\n\nCode\nexp(mean(log(orders)))\n\n\n[1] 57.708\n\n\nExpected answers:\n\nArithmetic mean: 230\nGeometric mean: ≈ 56.2\n\nWritten answer: $56 is a much more representative “typical” order value than $230, which is inflated by the single $1,000 order. The arithmetic mean squares the deviation of that outlier (via the averaging process), while the geometric mean works in log-space where the outlier is less extreme.\nWhat to look for: Student should explicitly name which is more representative and why the outlier affects the arithmetic mean more."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q4-log0-and-the-offset",
+    "href": "answers/w02_video_quiz_notes.html#q4-log0-and-the-offset",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "1.4 Q4 — Log(0) and the Offset",
+    "text": "1.4 Q4 — Log(0) and the Offset\n\n\nCode\nlog(0)\n\n\n[1] -Inf\n\n\nCode\nlog(0 + 1)\n\n\n[1] 0\n\n\nExpected answers:\n\nlog(0) returns -Inf\nlog(0 + 1) = log(1) = 0\n\nWritten answer (Q2): The offset ensures that even a customer with zero recency days or zero order amount doesn’t produce -Inf after log transformation, which would crash the model.\nWritten answer (Q3): log(1) = 0 because any base raised to the power 0 equals 1. Adding 1 as a lower bound means the minimum possible log-transformed value is 0, not negative infinity — a safe, neutral floor."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q5-base-conversion",
+    "href": "answers/w02_video_quiz_notes.html#q5-base-conversion",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "1.5 Q5 — Base Conversion",
+    "text": "1.5 Q5 — Base Conversion\n\n\nCode\nincome_val &lt;- 49021\nlog(income_val, base = 2)\n\n\n[1] 15.58111\n\n\nCode\nlog10(income_val)\n\n\n[1] 4.690382\n\n\nCode\nlog(income_val)\n\n\n[1] 10.8\n\n\nCode\nlog(income_val) / log10(income_val)\n\n\n[1] 2.302585\n\n\nExpected answers:\n\nBase 2: ≈ 15.58\nBase 10: ≈ 4.69\nNatural: ≈ 10.80\nRatio: ≈ 2.303 = log(10)\n\nWritten answer (Q3): The ratio is the constant log(10) ≈ 2.303 — any value in natural log equals its log10 value × 2.303. Since step_normalize() subtracts the mean and divides by the standard deviation, multiplying by a constant changes both the mean and SD proportionally, and the resulting z-scores are identical regardless of base.\nWhat to look for: Student must invoke step_normalize() explicitly, not just state “it doesn’t matter.”"
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q6-probability-vs.-odds",
+    "href": "answers/w02_video_quiz_notes.html#q6-probability-vs.-odds",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "2.1 Q6 — Probability vs. Odds",
+    "text": "2.1 Q6 — Probability vs. Odds\n\n\nCode\nyes &lt;- 142\nno &lt;- 3000 - 142\n\np &lt;- yes / (yes + no)\nodds &lt;- yes / no\n\ncat(\"Probability:\", round(p, 4), \"\\n\")\n\n\nProbability: 0.0473 \n\n\nCode\ncat(\"Odds       :\", round(odds, 4), \"\\n\")\n\n\nOdds       : 0.0497 \n\n\nExpected answers:\n\nProbability: ≈ 0.0473 (4.73%)\nOdds: ≈ 0.0497\n\nWritten answer (Q3): Odds of 0.05 means for every customer who responds, about 20 do not. A marketer might say: “We expect roughly 1 responder for every 20 non-responders mailed.”\nCommon mistake: Confusing probability (0.0473) and odds (0.0497) — they are close when the event is rare but diverge substantially as probability increases. Worth demonstrating with Q7."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q7-converting-between-probability-and-odds",
+    "href": "answers/w02_video_quiz_notes.html#q7-converting-between-probability-and-odds",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "2.2 Q7 — Converting Between Probability and Odds",
+    "text": "2.2 Q7 — Converting Between Probability and Odds\n\n\nCode\nprob_to_odds &lt;- function(p) p / (1 - p)\nprob_to_odds(0.20)\n\n\n[1] 0.25\n\n\nCode\nprob_to_odds(0.50)\n\n\n[1] 1\n\n\nCode\nprob_to_odds(0.80)\n\n\n[1] 4\n\n\nExpected answers:\n\nP = 0.20 → odds = 0.25 (1 in 4 chance: 1 success per 3 failures)\nP = 0.50 → odds = 1.00 (even odds: 1 success per 1 failure)\nP = 0.80 → odds = 4.00 (4 successes per 1 failure)\n\nPattern (Q4): As probability approaches 1, odds grow without bound toward infinity. The relationship is nonlinear and asymmetric — which is exactly the problem log(odds) fixes."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q8-why-logodds",
+    "href": "answers/w02_video_quiz_notes.html#q8-why-logodds",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "2.3 Q8 — Why Log(Odds)?",
+    "text": "2.3 Q8 — Why Log(Odds)?\n\n\nCode\nprobs &lt;- c(0.10, 0.50, 0.90)\nodds &lt;- probs / (1 - probs)\nlog_odds &lt;- log(odds)\n\ntibble(probability = probs, odds = odds, log_odds = log_odds)\n\n\n\n  \n\n\n\nExpected answers:\n\n\n\nprobability\nodds\nlog_odds\n\n\n\n\n0.10\n0.111\n−2.197\n\n\n0.50\n1.000\n0.000\n\n\n0.90\n9.000\n2.197\n\n\n\nQ2: log(odds) at P = 0.50 is 0 because odds = 1 (equal chance of success and failure), and log(1) = 0 for any base.\nQ3: Yes, the log(odds) values are symmetric: P = 0.10 gives −2.197 and P = 0.90 gives +2.197 (mirror images). This symmetry means a model can treat “more likely” and “less likely” on equal footing — impossible with raw odds (0.111 vs. 9.000 are not symmetric around any meaningful center)."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q9-the-logit-function",
+    "href": "answers/w02_video_quiz_notes.html#q9-the-logit-function",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "2.4 Q9 — The Logit Function",
+    "text": "2.4 Q9 — The Logit Function\n\n\nCode\np_respond &lt;- mean(mail_data$responded == \"yes\")\ncat(\"Response rate:\", round(p_respond, 4), \"\\n\")\n\n\nResponse rate: 0.0473 \n\n\nCode\nlog_odds_respond &lt;- log(p_respond / (1 - p_respond))\ncat(\"Log(odds)    :\", round(log_odds_respond, 3), \"\\n\")\n\n\nLog(odds)    : -3.002 \n\n\nExpected answers:\n\nResponse rate: ≈ 0.0473\nLog(odds): ≈ −3.004\n\nQ3 code:\n\n\nCode\n# Convert .pred_yes to log(odds)\npreds |&gt;\n  mutate(log_odds = log(.pred_yes / (1 - .pred_yes))) |&gt;\n  select(customer_id, .pred_yes, log_odds) |&gt;\n  head()\n\n\n\n  \n\n\n\nWhat to look for: Student correctly identifies plogis() as the inverse of log(p/(1-p)) — i.e., plogis(log_odds) gets back the probability."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q10-logodds-and-the-normal-distribution",
+    "href": "answers/w02_video_quiz_notes.html#q10-logodds-and-the-normal-distribution",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "2.5 Q10 — Log(Odds) and the Normal Distribution",
+    "text": "2.5 Q10 — Log(Odds) and the Normal Distribution\nWritten question — no code required.\nModel answer Q1: Probabilities are bounded between 0 and 1, which is inconvenient for a linear model (which can predict any value). Log(odds) transforms probabilities onto the real line (−∞ to +∞), where the assumption of normality is more plausible. Logistic regression models the log(odds) as a linear function of the predictors — so normality of log(odds) supports that linear modeling assumption.\nModel answer Q2: Working in probability space, the relationship between predictors and the outcome is inherently nonlinear (the S-curve). In log(odds) space, the same relationship is linear — which is what the linear predictor \\(\\beta_0 + \\beta_1 x_1 + \\ldots\\) in logistic regression actually models. Linear models are far simpler to estimate and interpret.\nWhat to look for: Students should connect log(odds) to the linear predictor, not just mention “normality” in the abstract."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q11-what-is-an-odds-ratio",
+    "href": "answers/w02_video_quiz_notes.html#q11-what-is-an-odds-ratio",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "3.1 Q11 — What Is an Odds Ratio?",
+    "text": "3.1 Q11 — What Is an Odds Ratio?\n\n\nCode\ntier_summary &lt;- mail_data |&gt;\n  group_by(loyalty_tier) |&gt;\n  summarise(\n    yes = sum(responded == \"yes\"),\n    no = sum(responded == \"no\"),\n    odds = yes / no\n  )\n\ntier_summary\n\n\n\n  \n\n\n\nCode\ngold_odds &lt;- tier_summary |&gt; filter(loyalty_tier == \"Gold\") |&gt; pull(odds)\nbronze_odds &lt;- tier_summary |&gt; filter(loyalty_tier == \"Bronze\") |&gt; pull(odds)\n\nOR &lt;- gold_odds / bronze_odds\ncat(\"Gold odds  :\", round(gold_odds, 4), \"\\n\")\n\n\nGold odds  : 0.05 \n\n\nCode\ncat(\"Bronze odds:\", round(bronze_odds, 4), \"\\n\")\n\n\nBronze odds: 0.0507 \n\n\nCode\ncat(\"Odds Ratio :\", round(OR, 3), \"\\n\")\n\n\nOdds Ratio : 0.985 \n\n\nExpected answers (may vary slightly by seed run):\n\nGold odds: ≈ 0.055\nBronze odds: ≈ 0.044\nOR (Gold/Bronze): ≈ 1.25\n\nQ4: An OR &gt; 1 means Gold tier customers have higher odds of responding than Bronze. Whether this is “stronger” or “weaker” depends on the other tiers — students should compare across all four in Q13.\nCommon mistake: Computing Bronze/Gold (reverse direction) — OR &lt; 1 is also valid but should be flagged as “reversed.”"
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q12-asymmetry-and-logodds-ratio",
+    "href": "answers/w02_video_quiz_notes.html#q12-asymmetry-and-logodds-ratio",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "3.2 Q12 — Asymmetry and Log(Odds Ratio)",
+    "text": "3.2 Q12 — Asymmetry and Log(Odds Ratio)\n\n\nCode\nlog(OR)\n\n\n[1] -0.01486402\n\n\nCode\nOR_reverse &lt;- bronze_odds / gold_odds\nlog(OR_reverse)\n\n\n[1] 0.01486402\n\n\nExpected answers:\n\nlog(OR): ≈ +0.22\nlog(OR_reverse): ≈ −0.22\n\nQ3: The two values are equal in magnitude but opposite in sign — perfect symmetry around 0. This is the key property that makes log(OR) useful: “no relationship” = 0, “positive” = above 0, “negative” = below 0, and reversing the direction just flips the sign rather than changing from 0.11 to 9 (raw odds ratio range)."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q13-effect-size-interpretation",
+    "href": "answers/w02_video_quiz_notes.html#q13-effect-size-interpretation",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "3.3 Q13 — Effect Size Interpretation",
+    "text": "3.3 Q13 — Effect Size Interpretation\n\n\nCode\ntier_summary |&gt;\n  mutate(\n    OR_vs_bronze = odds / bronze_odds,\n    log_OR = log(OR_vs_bronze)\n  ) |&gt;\n  arrange(desc(abs(log_OR)))\n\n\n\n  \n\n\n\nWhat to look for:\n\nPlatinum tier typically shows the largest |log(OR)| — highest response odds\nBronze is the reference (OR = 1, log(OR) = 0 by construction)\nStudent identifies the tier with the largest absolute log(OR) as the “strongest” predictor\nPlain English example: “Platinum customers are X times as likely to respond as Bronze customers” — students should compute exp(log_OR) to get the multiplier for the business communication"
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q14-fishers-exact-test",
+    "href": "answers/w02_video_quiz_notes.html#q14-fishers-exact-test",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "3.4 Q14 — Fisher’s Exact Test",
+    "text": "3.4 Q14 — Fisher’s Exact Test\n\n\nCode\ngold_bronze &lt;- mail_data |&gt;\n  filter(loyalty_tier %in% c(\"Gold\", \"Bronze\"))\n\nct &lt;- table(gold_bronze$loyalty_tier, gold_bronze$responded)\nct\n\n\n        \n          yes   no\n  Bronze   61 1202\n  Gold     27  540\n\n\nCode\nfisher.test(ct)\n\n\n\n    Fisher's Exact Test for Count Data\n\ndata:  ct\np-value = 1\nalternative hypothesis: true odds ratio is not equal to 1\n95 percent confidence interval:\n 0.6272765 1.6808508\nsample estimates:\nodds ratio \n  1.014967 \n\n\nWhat to look for:\n\np-value will typically be &gt; 0.05 for Gold vs. Bronze specifically — because loyalty_tier was generated independently of responded in mail_data (no relationship was built in), so students should conclude: not statistically significant\nQ4 written: Fisher’s Exact Test is preferred for small samples (&lt; ~5 expected counts in any cell), because chi-square relies on a normal approximation that breaks down with sparse tables.\n\n\n\n\n\n\n\nImportantTeaching Point\n\n\n\nThis is a deliberate result — the dataset was generated without any relationship between loyalty_tier and responded. Students who conclude “significant” have likely misread the p-value. This is a good moment to discuss the difference between descriptive odds ratios (which can differ from 1 by chance) and inferential tests."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q15-chi-square-test",
+    "href": "answers/w02_video_quiz_notes.html#q15-chi-square-test",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "3.5 Q15 — Chi-Square Test",
+    "text": "3.5 Q15 — Chi-Square Test\n\n\nCode\nchisq.test(ct)\n\n\n\n    Pearson's Chi-squared test with Yates' continuity correction\n\ndata:  ct\nX-squared = 1.1897e-28, df = 1, p-value = 1\n\n\nWhat to look for:\n\np-value should be similar to Fisher’s (typically both &gt; 0.05)\nConclusions should agree — if they don’t, this is worth discussing\nQ3 written: With 3,000 rows and reasonable cell counts, chi-square is appropriate here. Fisher’s becomes essential when any expected cell count falls below 5."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q16-wald-test-concept",
+    "href": "answers/w02_video_quiz_notes.html#q16-wald-test-concept",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "3.6 Q16 — Wald Test Concept",
+    "text": "3.6 Q16 — Wald Test Concept\nWritten question — no code required.\nModel answer Q1: “Many standard deviations from zero” means the log(OR) is large relative to its uncertainty (standard error). If the log(OR) is 2 standard deviations from zero, there is strong evidence the true relationship is not zero — similar to a z-test.\nModel answer Q2: Lasso’s penalty drives small coefficients to exactly zero — effectively the same goal as a Wald test identifying “useless” predictors. Both are asking “is this coefficient meaningfully different from zero?” — Lasso uses a regularization penalty rather than a formal hypothesis test, but the outcome (zeroing out weak predictors) is similar.\nModel answer Q3: The video says to use the test most commonly accepted in your specific field or context — there is no universal winner."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q17-connecting-odds-ratios-to-the-course",
+    "href": "answers/w02_video_quiz_notes.html#q17-connecting-odds-ratios-to-the-course",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "3.7 Q17 — Connecting Odds Ratios to the Course",
+    "text": "3.7 Q17 — Connecting Odds Ratios to the Course\nWritten question — no code required.\nModel answer Q1: A positive coefficient for freq_12mo means that as purchase frequency increases by one unit (after normalization), the log(odds) of responding increases. Exponentiating the coefficient gives the odds ratio — e.g., if the coefficient is 0.3, then exp(0.3) ≈ 1.35 means each additional purchase-frequency unit multiplies the odds of responding by 1.35.\nModel answer Q2: After normalization, all predictors are in standard deviation units. A coefficient of 0.3 for freq_12mo and 0.2 for income means frequency has a larger effect per standard deviation, regardless of whether frequency was measured in counts and income in dollars. Without normalization, coefficients would be in incompatible original units and cannot be meaningfully compared."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q18-linear-vs.-logistic-regression",
+    "href": "answers/w02_video_quiz_notes.html#q18-linear-vs.-logistic-regression",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "4.1 Q18 — Linear vs. Logistic Regression",
+    "text": "4.1 Q18 — Linear vs. Logistic Regression\nWritten question — no code required.\nModel answer Q1: Linear regression predicts a continuous outcome (e.g., order value). Logistic regression predicts the probability of a binary outcome (e.g., responded yes/no).\nModel answer Q2: A straight line is unbounded — it can predict values below 0 or above 1, which are impossible for a probability. At the extremes of predictor values, the line gives meaningless probability estimates. The logistic curve is bounded (0, 1) by design.\nModel answer Q3: For a very frequent, high-income customer, a linear model might predict a probability of 1.3 or higher — a value that cannot be interpreted as a probability. This makes it impossible to use the output for targeting decisions that require a valid probability."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q19-the-s-shaped-logistic-curve",
+    "href": "answers/w02_video_quiz_notes.html#q19-the-s-shaped-logistic-curve",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "4.2 Q19 — The S-Shaped Logistic Curve",
+    "text": "4.2 Q19 — The S-Shaped Logistic Curve\n\n\nCode\nplogis(-3)\n\n\n[1] 0.04742587\n\n\nCode\nplogis(0)\n\n\n[1] 0.5\n\n\nCode\nplogis(3)\n\n\n[1] 0.9525741\n\n\nExpected answers:\n\nplogis(-3) ≈ 0.047 — very low probability (customer very unlikely to respond)\nplogis(0) = 0.500 — exactly 50/50\nplogis(3) ≈ 0.953 — very high probability\n\nQ2: plogis(0) = 0.5 because: \\(P = \\frac{1}{1+e^0} = \\frac{1}{1+1} = 0.5\\). When the linear predictor is 0, there is no information pushing toward yes or no, so the probability defaults to 0.5.\nQ3 (the data generator line):\nprob = plogis(-3 + 0.02*(age-45) + 0.3*log(income/50000) + 0.1*freq_12mo - 0.005*recency_days)\nThe linear predictor says: response probability is driven by being older than average (+age), having higher income (+log income), purchasing more frequently (+freq_12mo), and having purchased recently (−recency_days). The intercept of −3 sets a low baseline probability (~4.7%), reflecting a realistic direct-mail response rate."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q20-maximum-likelihood-vs.-least-squares",
+    "href": "answers/w02_video_quiz_notes.html#q20-maximum-likelihood-vs.-least-squares",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "4.3 Q20 — Maximum Likelihood vs. Least Squares",
+    "text": "4.3 Q20 — Maximum Likelihood vs. Least Squares\nWritten question — no code required.\nModel answer Q1: With a binary outcome (0 or 1), the “residual” (predicted − actual) is either the probability itself or 1 minus the probability — not a continuous error that can be squared and summed in a meaningful way. Minimizing squared 0/1 residuals does not correspond to finding the best-fit curve.\nModel answer Q2: Maximum likelihood finds the curve that assigns the highest combined probability to the responses that were actually observed — the model that best “explains” the data as seen.\nModel answer Q3: Without residuals, we use classification metrics (accuracy, sensitivity, specificity, ROC AUC from Week 3) and the log-likelihood / deviance for assessing overall fit. These replace R² and RMSE that linear regression uses."
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q21-predicting-probability-vs.-class",
+    "href": "answers/w02_video_quiz_notes.html#q21-predicting-probability-vs.-class",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "4.4 Q21 — Predicting Probability vs. Class",
+    "text": "4.4 Q21 — Predicting Probability vs. Class\n\n\nCode\n# Distribution of predicted probabilities\nggplot(preds, aes(x = .pred_yes, fill = responded)) +\n  geom_histogram(bins = 40, alpha = 0.7, position = \"identity\") +\n  labs(\n    title = \"Distribution of Predicted Probabilities\",\n    x = \"P(responded = yes)\",\n    y = \"Count\"\n  ) +\n  theme_minimal()\n\n\n\n\n\n\n\n\n\nCode\n# Typical predicted probability\npreds |&gt; summarise(median_pred = median(.pred_yes), mean_pred = mean(.pred_yes))\n\n\n\n  \n\n\n\nWhat to look for:\n\nMost predicted probabilities cluster well below 0.5 (typically &lt; 0.15), because the model has learned the true 4.7% response rate\nThe 0.5 threshold therefore classifies almost everyone as “no” — achieving high accuracy (≈ 95%) but essentially zero sensitivity\nBetter threshold: something like 0.05–0.10 would catch more responders at the cost of more false positives — the exact tradeoff is what the ROC curve (Week 3) is designed to explore\nMetric from Week 3: roc_auc or examining sensitivity/specificity trade-off at different thresholds"
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q22-walds-test-and-variable-selection",
+    "href": "answers/w02_video_quiz_notes.html#q22-walds-test-and-variable-selection",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "4.5 Q22 — Wald’s Test and Variable Selection",
+    "text": "4.5 Q22 — Wald’s Test and Variable Selection\n\n\nCode\ncoef_tbl &lt;- mail_fit |&gt;\n  extract_fit_parsnip() |&gt;\n  tidy() |&gt;\n  filter(term != \"(Intercept)\") |&gt;\n  arrange(desc(abs(estimate)))\n\ncoef_tbl\n\n\n\n  \n\n\n\nWhat to look for:\n\nSeveral predictors will have estimate = 0 — zeroed out by Lasso\nfreq_12mo should have a positive coefficient (more purchases → higher response probability) — this matches the data generating process which included +0.1 * freq_12mo\nrecency_days should have a negative coefficient (more days since last purchase → lower response probability)\n\nQ1 written: Both Lasso and the Wald test aim to identify predictors that contribute no meaningful signal. Wald test does so via hypothesis testing (is the coefficient significantly different from zero?). Lasso does so by penalizing coefficient magnitude until weak predictors collapse to exactly zero. Both produce sparser, more interpretable models.\nQ3 interpretation example: “A positive coefficient for freq_12mo means that customers who purchase more frequently have higher odds of responding to the campaign — each standard deviation increase in purchase frequency multiplies the odds of responding by exp(coefficient).”"
+  },
+  {
+    "objectID": "answers/w02_video_quiz_notes.html#q23-synthesis-from-logs-to-logistic-regression",
+    "href": "answers/w02_video_quiz_notes.html#q23-synthesis-from-logs-to-logistic-regression",
+    "title": "Teacher’s Notes: Video Quiz — Foundations of Logistic Regression (Q1–Q23)",
+    "section": "4.6 Q23 — Synthesis: From Logs to Logistic Regression",
+    "text": "4.6 Q23 — Synthesis: From Logs to Logistic Regression\nWritten question — no code required.\nModel answer:\nThe four videos form a chain where each concept solves a problem created by the previous one:\n\nLogs → Odds: Odds are asymmetric (0 to 1 vs. 1 to ∞). Taking the log of odds creates a symmetric scale around zero, where 0 means “no association.”\nOdds → Odds Ratios: We compare odds across groups as a ratio rather than a difference, because multiplicative changes are natural for proportions (a 2× increase in odds is meaningful regardless of whether the base odds are 0.01 or 0.5; an additive difference of 0.01 means very different things).\nOdds Ratios → Logistic Regression: The logit (log odds) is exactly what the linear predictor in logistic regression models: \\(\\log\\left(\\frac{P}{1-P}\\right) = \\beta_0 + \\beta_1 x_1 + \\ldots + \\beta_k x_k\\). The coefficients are log(odds ratios) — the same concept from Step 1-3, now estimated from data instead of computed from a contingency table.\n\nQ2 one-sentence answer: “.pred_yes = 0.08 means the model estimates there is an 8% chance this specific customer will respond to the mailing, based on their combination of age, income, purchase frequency, recency, channel, region, and loyalty tier — after converting the linear predictor through the sigmoid function.”"
+  },
+  {
+    "objectID": "slides.html",
+    "href": "slides.html",
+    "title": "Module 2 Slides — Data Splitting & Preprocessing",
+    "section": "",
+    "text": "About These Slides\n  What the Slides Cover\n  Open the Slides\n  Key R Functions Introduced in the Slides"
+  },
+  {
+    "objectID": "slides.html#about-these-slides",
+    "href": "slides.html#about-these-slides",
+    "title": "Module 2 Slides — Data Splitting & Preprocessing",
+    "section": "About These Slides",
+    "text": "About These Slides\nThis slide deck gives you a big-picture overview of Module 2 before you work through the full codebook. Think of it as the map, not the territory — 27 slides covering the five stops of the module at a conceptual level, with just enough code to orient you before you see the full implementation.\nWork through these slides after the Video Quiz and before the Codebook. They take about 15–20 minutes to read through at your own pace."
+  },
+  {
+    "objectID": "slides.html#what-the-slides-cover",
+    "href": "slides.html#what-the-slides-cover",
+    "title": "Module 2 Slides — Data Splitting & Preprocessing",
+    "section": "What the Slides Cover",
+    "text": "What the Slides Cover\nThe deck is organized around five stops:\nStop 1 — The Dataset\n\nThe synthetic direct-mail campaign and its variables\nWhy income is right-skewed and what that means for modeling\nThe log-normal distribution and the geometric standard deviation\n\nStop 2 — The Split\n\nThe golden rule: fit on training data, apply to test data\nWhy evaluating on training data is optimistic (data leakage)\nStratified splitting with initial_split() and strata = responded\n\nStop 3 — The Recipe\n\nThe cooking metaphor: recipe(), step_*(), prep(), bake()\nAll six steps in the pipeline and the reason each one exists\nWhy step_impute_median() beats mean for skewed data\nWhy step_log(..., offset = 1) needs the offset\n\nStop 4 — The Workflow\n\nBundling recipe + model with workflow() so nothing gets forgotten\nRegularization at a glance — Ridge, Lasso, Elastic Net\nWhy penalty = 0.01 and mixture = 1 gives you a Lasso\n\nStop 5 — Inspecting the Recipe\n\nUsing tidy() to read what prep() learned\nThe “what you’ll actually type today” summary\nWhere this pattern reappears in later modules"
+  },
+  {
+    "objectID": "slides.html#open-the-slides",
+    "href": "slides.html#open-the-slides",
+    "title": "Module 2 Slides — Data Splitting & Preprocessing",
+    "section": "Open the Slides",
+    "text": "Open the Slides\n\n\n\n\n\n\nTip\n\n\n\nThe slides open in a new tab as a full-screen presentation. Use the arrow keys or click to advance. Press F for full screen, S for speaker notes, and Esc to exit full screen.\n\n\n\n  ▶ Open Slide Deck in New Tab"
+  },
+  {
+    "objectID": "slides.html#key-r-functions-introduced-in-the-slides",
+    "href": "slides.html#key-r-functions-introduced-in-the-slides",
+    "title": "Module 2 Slides — Data Splitting & Preprocessing",
+    "section": "Key R Functions Introduced in the Slides",
+    "text": "Key R Functions Introduced in the Slides\n\n\n\nFunction\nPackage\nPurpose\n\n\n\n\ninitial_split()\nrsample\nSplit data into train/test\n\n\ntraining(), testing()\nrsample\nExtract each partition\n\n\nrecipe()\nrecipes\nDeclare a preprocessing plan\n\n\nstep_impute_median()\nrecipes\nFill missing values with median\n\n\nstep_log()\nrecipes\nLog-transform numeric variables\n\n\nstep_normalize()\nrecipes\nCenter and scale to mean=0, sd=1\n\n\nstep_dummy()\nrecipes\nEncode categorical variables as 0/1\n\n\nstep_zv()\nrecipes\nRemove zero-variance predictors\n\n\nupdate_role()\nrecipes\nMark ID columns as non-predictors\n\n\nprep()\nrecipes\nLearn transformations from training data\n\n\nbake()\nrecipes\nApply learned transformations to any data\n\n\nworkflow()\nworkflows\nBundle recipe + model spec\n\n\nfit()\nworkflows\nTrain the full pipeline\n\n\ntidy()\nbroom\nInspect what a prepped recipe learned"
   },
   {
     "objectID": "w02_ds_preprocessing_slides.html#before-we-open-the-codebook",
@@ -336,297 +973,10 @@
     "text": "Let’s Open the Codebook\n\n\n\n\nFive stops.\n\n\nOne reusable pattern."
   },
   {
-    "objectID": "slides.html",
-    "href": "slides.html",
-    "title": "Module 2 Slides — Data Splitting & Preprocessing",
-    "section": "",
-    "text": "About These Slides\n  What the Slides Cover\n  Open the Slides\n  Key R Functions Introduced in the Slides"
-  },
-  {
-    "objectID": "slides.html#about-these-slides",
-    "href": "slides.html#about-these-slides",
-    "title": "Module 2 Slides — Data Splitting & Preprocessing",
-    "section": "About These Slides",
-    "text": "About These Slides\nThis slide deck gives you a big-picture overview of Module 2 before you work through the full codebook. Think of it as the map, not the territory — 27 slides covering the five stops of the module at a conceptual level, with just enough code to orient you before you see the full implementation.\nWork through these slides after the Video Quiz and before the Codebook. They take about 15–20 minutes to read through at your own pace."
-  },
-  {
-    "objectID": "slides.html#what-the-slides-cover",
-    "href": "slides.html#what-the-slides-cover",
-    "title": "Module 2 Slides — Data Splitting & Preprocessing",
-    "section": "What the Slides Cover",
-    "text": "What the Slides Cover\nThe deck is organized around five stops:\nStop 1 — The Dataset\n\nThe synthetic direct-mail campaign and its variables\nWhy income is right-skewed and what that means for modeling\nThe log-normal distribution and the geometric standard deviation\n\nStop 2 — The Split\n\nThe golden rule: fit on training data, apply to test data\nWhy evaluating on training data is optimistic (data leakage)\nStratified splitting with initial_split() and strata = responded\n\nStop 3 — The Recipe\n\nThe cooking metaphor: recipe(), step_*(), prep(), bake()\nAll six steps in the pipeline and the reason each one exists\nWhy step_impute_median() beats mean for skewed data\nWhy step_log(..., offset = 1) needs the offset\n\nStop 4 — The Workflow\n\nBundling recipe + model with workflow() so nothing gets forgotten\nRegularization at a glance — Ridge, Lasso, Elastic Net\nWhy penalty = 0.01 and mixture = 1 gives you a Lasso\n\nStop 5 — Inspecting the Recipe\n\nUsing tidy() to read what prep() learned\nThe “what you’ll actually type today” summary\nWhere this pattern reappears in later modules"
-  },
-  {
-    "objectID": "slides.html#open-the-slides",
-    "href": "slides.html#open-the-slides",
-    "title": "Module 2 Slides — Data Splitting & Preprocessing",
-    "section": "Open the Slides",
-    "text": "Open the Slides\n\n\n\n\n\n\nTip\n\n\n\nThe slides open in a new tab as a full-screen presentation. Use the arrow keys or click to advance. Press F for full screen, S for speaker notes, and Esc to exit full screen.\n\n\n\n  ▶ Open Slide Deck in New Tab"
-  },
-  {
-    "objectID": "slides.html#key-r-functions-introduced-in-the-slides",
-    "href": "slides.html#key-r-functions-introduced-in-the-slides",
-    "title": "Module 2 Slides — Data Splitting & Preprocessing",
-    "section": "Key R Functions Introduced in the Slides",
-    "text": "Key R Functions Introduced in the Slides\n\n\n\nFunction\nPackage\nPurpose\n\n\n\n\ninitial_split()\nrsample\nSplit data into train/test\n\n\ntraining(), testing()\nrsample\nExtract each partition\n\n\nrecipe()\nrecipes\nDeclare a preprocessing plan\n\n\nstep_impute_median()\nrecipes\nFill missing values with median\n\n\nstep_log()\nrecipes\nLog-transform numeric variables\n\n\nstep_normalize()\nrecipes\nCenter and scale to mean=0, sd=1\n\n\nstep_dummy()\nrecipes\nEncode categorical variables as 0/1\n\n\nstep_zv()\nrecipes\nRemove zero-variance predictors\n\n\nupdate_role()\nrecipes\nMark ID columns as non-predictors\n\n\nprep()\nrecipes\nLearn transformations from training data\n\n\nbake()\nrecipes\nApply learned transformations to any data\n\n\nworkflow()\nworkflows\nBundle recipe + model spec\n\n\nfit()\nworkflows\nTrain the full pipeline\n\n\ntidy()\nbroom\nInspect what a prepped recipe learned"
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html",
-    "href": "answers/w02_log_assignments_notes.html",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "",
-    "text": "Setup\n  1 Assignment L.1 — Dollar to Log\n  \n  1.1 Answer Key\n  1.2 What to Look For\n  1.3 Common Mistakes\n  \n  2 Assignment L.2 — Log Back to Dollar (Median and Mean)\n  \n  2.1 Answer Key\n  2.2 What to Look For\n  2.3 Common Mistakes\n  2.4 Discussion Point\n  \n  3 Assignment L.3 — Geometric Standard Deviation\n  \n  3.1 Answer Key\n  3.2 What to Look For\n  3.3 Common Mistakes\n  \n  4 Assignment L.4 — Confirm with Real Data\n  \n  4.1 Answer Key\n  4.2 What to Look For\n  4.3 Common Mistakes\n  4.4 Discussion Point\n  \n  5 Assignment L.5 — Base 10 vs. Natural Log\n  \n  5.1 Answer Key\n  5.2 What to Look For\n  5.3 Common Mistakes\n  \n  Quick Grading Reference"
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#answer-key",
-    "href": "answers/w02_log_assignments_notes.html#answer-key",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "1.1 Answer Key",
-    "text": "1.1 Answer Key\n\n\nCode\n# Natural log\nlog(233070)\n\n\n[1] 12.35909\n\n\nCode\n# Log base 10\nlog10(233070)\n\n\n[1] 5.367486\n\n\nCode\n# equivalently:\nlog(233070, base = 10)\n\n\n[1] 5.367486\n\n\nExpected answers:\n\nNatural log: ≈ 12.36\nLog base 10: ≈ 5.37\n\nWritten answer (Q4): Either base 10 or natural log is acceptable for the recipe — they differ only by a constant factor (log(10) ≈ 2.303), and step_normalize() absorbs that difference. The base = 10 choice is a convention for interpretability: log10 values map intuitively to order of magnitude ($10K → 4, $100K → 5, $1M → 6)."
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#what-to-look-for",
-    "href": "answers/w02_log_assignments_notes.html#what-to-look-for",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "1.2 What to Look For",
-    "text": "1.2 What to Look For\n\nBoth numeric answers correct ✓\nStudent recognizes the two results are proportional, not equal ✓\nWritten justification mentions either interpretability or that step_normalize() makes the base choice irrelevant for modeling ✓"
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#common-mistakes",
-    "href": "answers/w02_log_assignments_notes.html#common-mistakes",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "1.3 Common Mistakes",
-    "text": "1.3 Common Mistakes\n\nConfusing log() (natural) with log10() — watch for students who report the same number for both\nClaiming base 10 is “more accurate” — both bases are equally valid; correctness is about convention and interpretability"
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#answer-key-1",
-    "href": "answers/w02_log_assignments_notes.html#answer-key-1",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "2.1 Answer Key",
-    "text": "2.1 Answer Key\n\n\nCode\n# Median income\nexp(10.8)\n\n\n[1] 49020.8\n\n\nCode\n# Mean income — note the correction term sigma^2 / 2\nmu    &lt;- 10.8\nsigma &lt;- 0.6\nexp(mu + sigma^2 / 2)\n\n\n[1] 58688.55\n\n\nCode\n# Verify the formula directly\nexp(10.8 + 0.6^2 / 2)\n\n\n[1] 58688.55\n\n\nExpected answers:\n\nMedian: ≈ $49,021\nMean: ≈ $58,689 (some rounding acceptable: $58,670–$58,710)\n\nWritten answer (Q4): Income is right-skewed — a small number of very high earners pull the arithmetic mean upward. The median is the middle value and is preserved under the exp() transformation. The correction term \\(e^{\\sigma^2/2}\\) accounts for the asymmetric “stretching” that exponentiation applies to a symmetric log-scale distribution."
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#what-to-look-for-1",
-    "href": "answers/w02_log_assignments_notes.html#what-to-look-for-1",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "2.2 What to Look For",
-    "text": "2.2 What to Look For\n\nStudents must use exp(), not 10^x — both are valid mathematically (exp(10.8) = 10^(10.8/log(10))), but exp() is the correct inverse of the natural log used in rlnorm()\nThe correction term sigma^2 / 2 = 0.18 must be added before exp(), not multiplied after\nWritten explanation should mention skewness or outliers pulling the mean up"
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#common-mistakes-1",
-    "href": "answers/w02_log_assignments_notes.html#common-mistakes-1",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "2.3 Common Mistakes",
-    "text": "2.3 Common Mistakes\n\nUsing 10^10.8 instead of exp(10.8) — gives a different and incorrect answer (~630 billion) because the log base used in rlnorm() is natural\nForgetting the sigma^2/2 correction for the mean\nClaiming mean = median for income — the whole point is they differ"
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#discussion-point",
-    "href": "answers/w02_log_assignments_notes.html#discussion-point",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "2.4 Discussion Point",
-    "text": "2.4 Discussion Point\nAsk: “If a new customer has unknown income, which value would you use for imputation — the mean or median from the log scale — and why?” This connects directly to Exercise 8.1 in the main notebook (median vs. mean imputation)."
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#answer-key-2",
-    "href": "answers/w02_log_assignments_notes.html#answer-key-2",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "3.1 Answer Key",
-    "text": "3.1 Answer Key\n\n\nCode\n# GSD\ngsd &lt;- exp(0.6)\ngsd  # ≈ 1.822\n\n\n[1] 1.822119\n\n\nCode\n# Median income (from L.2)\nmedian_income &lt;- exp(10.8)  # ≈ 49,021\n\n# Typical range\nlower &lt;- median_income / gsd\nupper &lt;- median_income * gsd\n\ncat(\"GSD           :\", round(gsd, 3), \"\\n\")\n\n\nGSD           : 1.822 \n\n\nCode\ncat(\"Median income : $\", round(median_income), \"\\n\")\n\n\nMedian income : $ 49021 \n\n\nCode\ncat(\"Lower bound   : $\", round(lower), \"\\n\")\n\n\nLower bound   : $ 26903 \n\n\nCode\ncat(\"Upper bound   : $\", round(upper), \"\\n\")\n\n\nUpper bound   : $ 89322 \n\n\nExpected answers:\n\nGSD: ≈ 1.822\nLower: ≈ $26,908 (acceptable range: $26,800–$27,100)\nUpper: ≈ $89,301 (acceptable range: $89,000–$89,500)\n\nThese should match the green shaded band in the Week 2 notebook plot.\nWritten answer (Q4): A typical customer’s income falls between roughly $27K and $89K. Unlike the regular standard deviation (which adds and subtracts), the GSD multiplies and divides, reflecting that income variation is proportional, not additive. A marketer might use this to define a “mainstream income segment” for targeting."
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#what-to-look-for-2",
-    "href": "answers/w02_log_assignments_notes.html#what-to-look-for-2",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "3.2 What to Look For",
-    "text": "3.2 What to Look For\n\nGSD computed as exp(sdlog), not exp(meanlog) — common confusion\nRange uses multiplication/division, not addition/subtraction ✓\nValues roughly match the notebook’s green band ✓\nWritten interpretation is in plain English (dollars, not log units) ✓"
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#common-mistakes-2",
-    "href": "answers/w02_log_assignments_notes.html#common-mistakes-2",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "3.3 Common Mistakes",
-    "text": "3.3 Common Mistakes\n\nUsing exp(meanlog) instead of exp(sdlog) for GSD\nAdding/subtracting GSD instead of multiplying/dividing: 49021 - 1.822 vs. 49021 / 1.822 — the subtraction is meaningless"
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#answer-key-3",
-    "href": "answers/w02_log_assignments_notes.html#answer-key-3",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "4.1 Answer Key",
-    "text": "4.1 Answer Key\n\n\nCode\n# Step 1: empirical median and mean of income\nmail_data |&gt;\n  summarise(\n    median_income = median(income, na.rm = TRUE),\n    mean_income   = mean(income,   na.rm = TRUE)\n  )\n\n\n\n  \n\n\n\nCode\n# Step 2: create log_income, compute its median and mean\nmail_data |&gt;\n  mutate(log_income = log(income)) |&gt;\n  summarise(\n    median_log = median(log_income, na.rm = TRUE),\n    mean_log   = mean(log_income,   na.rm = TRUE)\n  )\n\n\n\n  \n\n\n\nCode\n# Step 3: back-transform\nlog_stats &lt;- mail_data |&gt;\n  mutate(log_income = log(income)) |&gt;\n  summarise(\n    median_log = median(log_income, na.rm = TRUE),\n    mean_log   = mean(log_income,   na.rm = TRUE)\n  )\n\ncat(\"exp(median log_income):\", round(exp(log_stats$median_log)), \"\\n\")\n\n\nexp(median log_income): 49331 \n\n\nCode\ncat(\"exp(mean log_income)  :\", round(exp(log_stats$mean_log)),   \"\\n\")\n\n\nexp(mean log_income)  : 48916 \n\n\nCode\ncat(\"Theoretical median    :\", round(exp(10.8)),                  \"\\n\")\n\n\nTheoretical median    : 49021 \n\n\nCode\ncat(\"Theoretical mean      :\", round(exp(10.8 + 0.6^2/2)),       \"\\n\")\n\n\nTheoretical mean      : 58689 \n\n\nExpected observations:\n\nEmpirical median of income ≈ $49,332 (close to theoretical $49,021)\nEmpirical mean of income ≈ $58,350 (close to theoretical $58,689)\nSmall differences are expected due to finite sampling (n = 3,000) and the 8% missingness in income\nexp(median(log_income)) recovers a value close to the theoretical median — the geometric mean of income\nexp(mean(log_income)) is close to but not exactly the arithmetic mean of income — it is the geometric mean on the log scale"
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#what-to-look-for-3",
-    "href": "answers/w02_log_assignments_notes.html#what-to-look-for-3",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "4.2 What to Look For",
-    "text": "4.2 What to Look For\n\nStudent uses na.rm = TRUE — without it the result is NA ✓\nDifferences between theoretical and empirical values explained by finite sampling, not a code error ✓\nStudent recognizes exp(mean(log_income)) ≠ mean(income) — a conceptually important distinction ✓"
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#common-mistakes-3",
-    "href": "answers/w02_log_assignments_notes.html#common-mistakes-3",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "4.3 Common Mistakes",
-    "text": "4.3 Common Mistakes\n\nForgetting na.rm = TRUE\nExpecting exact match to theoretical values and concluding the code is wrong\nConfusing geometric mean (exp(mean(log(x)))) with arithmetic mean"
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#discussion-point-1",
-    "href": "answers/w02_log_assignments_notes.html#discussion-point-1",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "4.4 Discussion Point",
-    "text": "4.4 Discussion Point\nThis exercise plants a seed for Week 3’s resampling discussion: “A single sample of 3,000 gives slightly different statistics than the population parameters. What does that imply about how much we should trust a model trained on one particular sample?”"
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#answer-key-4",
-    "href": "answers/w02_log_assignments_notes.html#answer-key-4",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "5.1 Answer Key",
-    "text": "5.1 Answer Key\n\n\nCode\n# Step 1 & 2: build the tibble\nresult &lt;- tibble(\n  income = c(10000, 100000, 1000000)\n) |&gt;\n  mutate(\n    log_natural = log(income),\n    log_base10  = log10(income)\n  )\nresult\n\n\n\n  \n\n\n\nCode\n# Step 3: compute the ratio\nresult |&gt;\n  mutate(ratio = log_natural / log_base10)\n\n\n\n  \n\n\n\nCode\n# The constant is log(10)\nlog(10)\n\n\n[1] 2.302585\n\n\nExpected answers:\n\n\n\nincome\nlog_natural\nlog_base10\nratio\n\n\n\n\n10,000\n9.210\n4\n2.303\n\n\n100,000\n11.513\n5\n2.303\n\n\n1,000,000\n13.816\n6\n2.303\n\n\n\nThe ratio is always log(10) ≈ 2.303.\nWritten answer (Q4): Since natural log = log10 × log(10), the two columns are related by a constant multiplier. step_normalize() centers by the mean and divides by the standard deviation — both operations absorb any constant multiplier, leaving the normalized values identical regardless of which base was used. So the choice of base is a cosmetic preference, not a modeling decision."
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#what-to-look-for-4",
-    "href": "answers/w02_log_assignments_notes.html#what-to-look-for-4",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "5.2 What to Look For",
-    "text": "5.2 What to Look For\n\nRatio is constant across all three rows ✓\nStudent identifies the constant as log(10) ≈ 2.303 ✓\nWritten explanation correctly invokes step_normalize() as the reason base doesn’t matter ✓\nLog base 10 values are exact integers (4, 5, 6) — a nice sanity check ✓"
-  },
-  {
-    "objectID": "answers/w02_log_assignments_notes.html#common-mistakes-4",
-    "href": "answers/w02_log_assignments_notes.html#common-mistakes-4",
-    "title": "Teacher’s Notes: Week 2 Log Assignments (L.1–L.5)",
-    "section": "5.3 Common Mistakes",
-    "text": "5.3 Common Mistakes\n\nDividing in the wrong direction (log10 / log_natural) — gives 1/2.303 ≈ 0.434 = log10(e), which is also correct but less intuitive\nClaiming base 10 is “better” without referencing normalization\nNot noticing that log10 of powers of 10 are exact integers"
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html",
-    "href": "w02_ds_preprocessing.html",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "",
-    "text": "Learning Objectives\n  1 Setup\n  2 The Marketing Dataset\n  \n  2.1 Explaining how Income distribution changes from normal to logged data\n  \n  3 Data Splitting\n  \n  3.1 Why We Split\n  3.2 Stratified Random Split\n  3.3 ✏️ Exercise 3.1\n  \n  4 Building a Recipe\n  \n  4.1 Step-by-Step Construction\n  \n  4.1.1 What did we just build?\n  \n  4.2 Deep Dive: Each Step\n  \n  4.2.1 Imputation (step_impute_median)\n  4.2.2 Log Transformation (step_log)\n  4.2.3 Normalization (step_normalize)\n  4.2.4 Dummy Variables (step_dummy)\n  \n  \n  5 Preparing and Baking\n  6 Connecting the Recipe to a Model Workflow\n  \n  6.1 Regularization Concept\n  6.2 Fitting and Predicting\n  \n  7 Inspecting and Debugging a Recipe\n  8 Exercises\n  \n  8.1 ✏️ Exercise 8.1 — Alternative Imputation\n  8.2 ✏️ Exercise 8.2 — Different Encoding\n  8.3 ✏️ Exercise 8.3 — Interaction Term\n  8.4 ✏️ Exercise 8.4 — Remove a Step\n  8.5 ✏️ Exercise 8.5 — Stratification Check\n  8.6 ✏️ Exercise 8.6 — Data Leakage\n  8.7 ✏️ Exercise 8.7 — Inspecting a Recipe\n  8.8 ✏️ Exercise 8.8 — Variable Roles\n  \n  9 Summary"
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html#explaining-how-income-distribution-changes-from-normal-to-logged-data",
-    "href": "w02_ds_preprocessing.html#explaining-how-income-distribution-changes-from-normal-to-logged-data",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "2.1 Explaining how Income distribution changes from normal to logged data",
-    "text": "2.1 Explaining how Income distribution changes from normal to logged data\n\n\nCode\nlibrary(tidyverse)\nlibrary(patchwork)\n\nset.seed(42)\nn &lt;- 5000\nmeanlog &lt;- 10.8\nsdlog &lt;- 0.6\n\nincome &lt;- rlnorm(n, meanlog = meanlog, sdlog = sdlog)\nlog_income &lt;- log(income)\n\nmedian_raw &lt;- exp(meanlog)\nmean_raw &lt;- exp(meanlog + sdlog^2 / 2)\ngsd_low &lt;- median_raw / exp(sdlog)\ngsd_high &lt;- median_raw * exp(sdlog)\nlog_median &lt;- meanlog\nlog_mean &lt;- meanlog + sdlog^2 / 2\nlog_sd_low &lt;- meanlog - sdlog\nlog_sd_high &lt;- meanlog + sdlog\n\ndf_raw &lt;- tibble(income = income) |&gt; filter(income &lt; 250000)\ndf_log &lt;- tibble(log_income = log_income)\n\np1 &lt;- ggplot(df_raw, aes(x = income)) +\n  annotate(\n    \"rect\",\n    xmin = gsd_low,\n    xmax = gsd_high,\n    ymin = -Inf,\n    ymax = Inf,\n    fill = \"#97C459\",\n    alpha = 0.15\n  ) +\n  geom_histogram(\n    bins = 50,\n    fill = \"#85B7EB\",\n    color = \"#378ADD\",\n    linewidth = 0.3\n  ) +\n  geom_vline(aes(xintercept = median_raw, color = \"Median\"), linewidth = 1) +\n  geom_vline(\n    aes(xintercept = mean_raw, color = \"Mean\"),\n    linewidth = 1,\n    linetype = \"dashed\"\n  ) +\n  annotate(\n    \"text\",\n    x = median_raw - 1500,\n    y = Inf,\n    label = \"median\\n$49K\",\n    color = \"#E24B4A\",\n    vjust = 1.3,\n    hjust = 1,\n    size = 3\n  ) +\n  annotate(\n    \"text\",\n    x = mean_raw + 1500,\n    y = Inf,\n    label = \"mean\\n$59K\",\n    color = \"#BA7517\",\n    vjust = 1.3,\n    hjust = 0,\n    size = 3\n  ) +\n  scale_color_manual(values = c(\"Median\" = \"#E24B4A\", \"Mean\" = \"#BA7517\")) +\n  scale_x_continuous(\n    labels = scales::dollar_format(scale = 1e-3, suffix = \"K\")\n  ) +\n  labs(x = \"Income ($)\", y = \"Count\", title = \"Income (original scale)\") +\n  theme_minimal(base_size = 12) +\n  theme(\n    legend.position = \"none\",\n    plot.title = element_text(size = 11, face = \"bold\", color = \"gray40\")\n  )\n\np2 &lt;- ggplot(df_log, aes(x = log_income)) +\n  annotate(\n    \"rect\",\n    xmin = log_sd_low,\n    xmax = log_sd_high,\n    ymin = -Inf,\n    ymax = Inf,\n    fill = \"#97C459\",\n    alpha = 0.15\n  ) +\n  geom_histogram(\n    bins = 40,\n    fill = \"#85B7EB\",\n    color = \"#378ADD\",\n    linewidth = 0.3\n  ) +\n  geom_vline(aes(xintercept = log_median, color = \"Median\"), linewidth = 1) +\n  geom_vline(\n    aes(xintercept = log_mean, color = \"Mean\"),\n    linewidth = 1,\n    linetype = \"dashed\"\n  ) +\n  annotate(\n    \"text\",\n    x = log_median - 0.03,\n    y = Inf,\n    label = \"median\\n10.8\",\n    color = \"#E24B4A\",\n    vjust = 1.3,\n    hjust = 1,\n    size = 3\n  ) +\n  annotate(\n    \"text\",\n    x = log_mean + 0.03,\n    y = Inf,\n    label = \"mean\\n10.98\",\n    color = \"#BA7517\",\n    vjust = 1.3,\n    hjust = 0,\n    size = 3\n  ) +\n  scale_color_manual(values = c(\"Median\" = \"#E24B4A\", \"Mean\" = \"#BA7517\")) +\n  scale_x_continuous(breaks = seq(8, 14, by = 0.5)) +\n  labs(\n    x = \"log(income)\",\n    y = \"Count\",\n    title = \"log(income) — transformed scale\"\n  ) +\n  theme_minimal(base_size = 12) +\n  theme(\n    legend.position = \"none\",\n    plot.title = element_text(size = 11, face = \"bold\", color = \"gray40\")\n  )\n\np1 / p2\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nNoteLog-Normal Parameters: What Do They Mean?\n\n\n\nThe income variable was generated using a log-normal distribution via rlnorm(n, meanlog = 10.8, sdlog = 0.6). The parameters meanlog and sdlog describe the distribution of log(income) — not income itself. To recover interpretable statistics on the original dollar scale:\nMedian income (the “typical” earner): \\[\\text{Median} = e^{\\mu} = e^{10.8} \\approx \\$49{,}021\\]\nMean income (pulled up by high earners): \\[\\text{Mean} = e^{\\mu + \\sigma^2/2} = e^{10.8 + 0.18} \\approx \\$58{,}689\\]\nWhy are they different? Income is right-skewed — a small number of high earners pull the mean above the median. The median is preserved under exponentiation (the middle person stays the middle person), but the mean is not. The correction term \\(e^{\\sigma^2/2}\\) accounts for the skew introduced by the long right tail.\nStandard deviation on the dollar scale is less commonly reported for log-normal data. Instead, practitioners often describe spread using the geometric standard deviation (GSD): \\[\\text{GSD} = e^{\\sigma} = e^{0.6} \\approx 1.82\\]\nThis means a typical income is within a factor of 1.82 above or below the median — roughly between \\(\\$49{,}021 / 1.82 \\approx \\$26{,}935\\) and \\(\\$49{,}021 \\times 1.82 \\approx \\$89{,}218\\)."
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html#why-we-split",
-    "href": "w02_ds_preprocessing.html#why-we-split",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "3.1 Why We Split",
-    "text": "3.1 Why We Split\nThe test set simulates unseen future customers. Any transformation parameter (mean, standard deviation, imputation value) estimated on the full dataset “leaks” information about the test set into the model — this is called data leakage and leads to overly optimistic performance estimates.\nThe golden rule: fit everything on training data, apply to test data."
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html#stratified-random-split",
-    "href": "w02_ds_preprocessing.html#stratified-random-split",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "3.2 Stratified Random Split",
-    "text": "3.2 Stratified Random Split\n\n\nCode\nmail_data |&gt;\n  count(responded) |&gt;\n  mutate(percent = n / sum(n))\n\n\n\n  \n\n\n\nCode\nset.seed(617)\nmail_split &lt;- initial_split(\n  mail_data,\n  prop = 0.80, # 80 % train, 20 % test\n  strata = responded # preserve class balance in both sets\n)\n\nmail_train &lt;- training(mail_split)\nmail_test &lt;- testing(mail_split)\n\ncat(\"Training rows:\", nrow(mail_train), \"\\n\")\n\n\nTraining rows: 2400 \n\n\nCode\ncat(\"Test rows    :\", nrow(mail_test), \"\\n\")\n\n\nTest rows    : 600 \n\n\n\n\nCode\n# Verify class balance is preserved\nbind_rows(\n  mail_train |&gt; count(responded) |&gt; mutate(set = \"train\"),\n  mail_test |&gt; count(responded) |&gt; mutate(set = \"test\")\n) |&gt;\n  group_by(set) |&gt;\n  mutate(pct = n / sum(n) * 100)\n\n\n\n  \n\n\n\n\n\n\n\n\n\nTip\n\n\n\nMarketing note. Direct-mail response rates are typically 1–5 %. Stratification ensures the rare “yes” class is represented in both sets. Without it, a small test set might have almost no responders by chance."
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html#exercise-3.1",
-    "href": "w02_ds_preprocessing.html#exercise-3.1",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "3.3 ✏️ Exercise 3.1",
-    "text": "3.3 ✏️ Exercise 3.1\nChange prop to 0.70 and re-run the split. How many records move from training to test? How does the response rate change?\n\n\nCode\n# Your code here"
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html#step-by-step-construction",
-    "href": "w02_ds_preprocessing.html#step-by-step-construction",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "4.1 Step-by-Step Construction",
-    "text": "4.1 Step-by-Step Construction\n\n\nCode\nmail_rec &lt;- recipe(responded ~ ., data = mail_train) |&gt;\n\n  # ── Step 1: Remove ID column (not a predictor) ────────────────────────────\n  update_role(customer_id, new_role = \"ID\") |&gt;\n\n  # ── Step 2: Impute missing numeric values with the median ─────────────────\n  step_impute_median(all_numeric_predictors()) |&gt;\n\n  # ── Step 3: Log-transform right-skewed numeric predictors ─────────────────\n  step_log(income, avg_order_amt, recency_days, base = 10, offset = 1) |&gt;\n\n  # ── Step 4: Normalize (center + scale) all numeric predictors ─────────────\n  step_normalize(all_numeric_predictors()) |&gt;\n\n  # ── Step 5: Create dummy variables from nominal predictors ─────────────────\n  step_dummy(all_nominal_predictors()) |&gt;\n\n  # ── Step 6: Remove zero-variance predictors (safety net) ──────────────────\n  step_zv(all_predictors())\n\nmail_rec\n\n\n\n4.1.1 What did we just build?\n\n\nCode\nsummary(mail_rec) # variable roles"
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html#deep-dive-each-step",
-    "href": "w02_ds_preprocessing.html#deep-dive-each-step",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "4.2 Deep Dive: Each Step",
-    "text": "4.2 Deep Dive: Each Step\n\n4.2.1 Imputation (step_impute_median)\n\n\nCode\n# How much is missing?\nmail_train |&gt;\n  summarise(across(everything(), ~ mean(is.na(.)) * 100)) |&gt;\n  pivot_longer(\n    everything(),\n    names_to = \"variable\",\n    values_to = \"pct_missing\"\n  ) |&gt;\n  filter(pct_missing &gt; 0)\n\n\n\n  \n\n\n\n\n\n\n\n\n\nImportant\n\n\n\nWhy median and not mean? The median is robust to the same right-skew that makes these variables candidates for log transformation. Using the mean on a skewed distribution would impute an “average” that may not represent the typical customer.\n\n\n\n\n4.2.2 Log Transformation (step_log)\n\n\nCode\n# Visual: income before and after log10\np1 &lt;- mail_train |&gt;\n  filter(!is.na(income)) |&gt;\n  ggplot(aes(income)) +\n  geom_histogram(bins = 40, fill = \"steelblue\", alpha = 0.7) +\n  labs(title = \"Income — raw\", x = \"income ($)\")\n\np2 &lt;- mail_train |&gt;\n  filter(!is.na(income)) |&gt;\n  ggplot(aes(log10(income))) +\n  geom_histogram(bins = 40, fill = \"darkorange\", alpha = 0.7) +\n  labs(title = \"Income — log10\", x = \"log10(income)\")\n\nlibrary(patchwork)\np1 + p2\n\n\n\n\n\n\n\n\n\n\n\n4.2.3 Normalization (step_normalize)\nCentering and scaling puts all numeric variables on the same unit-free scale. This is required for distance-based models (KNN, SVM) and strongly recommended for logistic regression with regularization.\n\n\nCode\n# Prep just the first three steps to see the effect of normalization\nrec_partial &lt;- recipe(\n  responded ~ income + freq_12mo + age,\n  data = mail_train\n) |&gt;\n  step_impute_median(all_numeric_predictors()) |&gt;\n  step_log(income, base = 10, offset = 1) |&gt;\n  step_normalize(all_numeric_predictors())\n\nprep(rec_partial) |&gt;\n  bake(new_data = mail_train) |&gt;\n  summary()\n\n\n     income            freq_12mo             age           responded \n Min.   :-3.448174   Min.   :-1.72324   Min.   :-2.89068   yes: 111  \n 1st Qu.:-0.615244   1st Qu.:-0.55560   1st Qu.:-0.69877   no :2289  \n Median :-0.007824   Median : 0.02822   Median :-0.02434             \n Mean   : 0.000000   Mean   : 0.00000   Mean   : 0.00000             \n 3rd Qu.: 0.635022   3rd Qu.: 0.61204   3rd Qu.: 0.73439             \n Max.   : 3.920573   Max.   : 4.11495   Max.   : 3.43212             \n\n\n\n\n4.2.4 Dummy Variables (step_dummy)\n\n\nCode\n# Inspect how many dummies will be created\nmail_train |&gt;\n  select(channel, region, loyalty_tier) |&gt;\n  summarise(\n    channel_levels = n_distinct(channel),\n    region_levels = n_distinct(region),\n    loyalty_tier_levels = n_distinct(loyalty_tier)\n  )\n\n\n\n  \n\n\n\nstep_dummy() creates \\(k - 1\\) columns per factor (reference encoding) to avoid perfect multicollinearity."
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html#regularization-concept",
-    "href": "w02_ds_preprocessing.html#regularization-concept",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "6.1 Regularization Concept",
-    "text": "6.1 Regularization Concept\n\n\n\n\n\n\nNoteRegularization: Ridge, Lasso, and Elastic Net\n\n\n\n\nWhy Regularization?\nOrdinary logistic regression finds coefficients that best fit the training data. But with many predictors — common in marketing datasets with demographics, behavioral variables, and RFM features — the model can overfit: it learns the noise in the training data rather than the true signal, and performs poorly on new customers.\nRegularization fixes this by adding a penalty term to the loss function that discourages large coefficients. The model is forced to be simpler, which usually means it generalizes better to new data.\nThe penalized loss function looks like this:\n\\[\\text{Loss} = \\text{(fit to training data)} + \\lambda \\cdot \\text{(penalty on coefficients)}\\]\nThe \\(\\lambda\\) (penalty) parameter controls how hard we squeeze the coefficients:\n\n\\(\\lambda = 0\\): no regularization, ordinary logistic regression\nLarge \\(\\lambda\\): heavy shrinkage, very simple model\n\n\n\n\nThree Flavors of Regularization\n\nRidge (L2)\nRidge adds the sum of squared coefficients as the penalty:\n\\[\\text{Penalty} = \\sum_{j} \\beta_j^2\\]\nRidge shrinks all coefficients toward zero but never sets them exactly to zero. Every predictor stays in the model, just with a smaller influence. This works well when you believe most predictors are genuinely useful and want to reduce their magnitude without discarding any.\nIn tidymodels: mixture = 0\n\n\nLasso (L1)\nLasso adds the sum of absolute coefficients as the penalty:\n\\[\\text{Penalty} = \\sum_{j} |\\beta_j|\\]\nLasso can shrink coefficients all the way to exactly zero, effectively removing those predictors from the model. This makes Lasso a built-in variable selection tool — it produces a sparse model that only keeps the most important predictors. In a direct-mail context, this is useful when you have dozens of customer attributes and want the model to tell you which ones actually drive response.\nIn tidymodels: mixture = 1\n\n\nElastic Net\nElastic net blends Ridge and Lasso:\n\\[\\text{Penalty} = \\alpha \\sum_{j} |\\beta_j| + (1 - \\alpha) \\sum_{j} \\beta_j^2\\]\nThe mixture parameter (\\(\\alpha\\)) controls the blend:\n\n\n\nmixture\nBehavior\n\n\n\n\n1\nPure Lasso\n\n\n0\nPure Ridge\n\n\n0.5\nEqual blend of both\n\n\n\nElastic net is often the safest default when you are unsure: it can do variable selection like Lasso while handling correlated predictors more stably (Lasso tends to arbitrarily pick one variable from a correlated group; elastic net can keep both with reduced coefficients).\nIn tidymodels: 0 &lt; mixture &lt; 1\n\n\n\n\nChoosing \\(\\lambda\\)\nThe penalty value (\\(\\lambda\\)) is a hyperparameter — it is not learned from the data during model fitting. Instead, it must be chosen beforehand or tuned using cross-validation. A common workflow in tidymodels is to replace the fixed value with tune() and search over a grid of candidates:\nlr_spec &lt;- logistic_reg(penalty = tune(), mixture = 1) |&gt;\n  set_engine(\"glmnet\") |&gt;\n  set_mode(\"classification\")\nFor now, we use penalty = 0.01 as a reasonable starting value. Later in the course we will tune this properly.\n\n\n\nQuick Reference\n\n\n\n\n\n\n\n\n\nMethod\nPenalty type\nZeroes out predictors?\nBest when…\n\n\n\n\nRidge\nSum of squares\nNo\nMost predictors are useful\n\n\nLasso\nSum of absolutes\nYes\nMany irrelevant predictors\n\n\nElastic net\nBlend of both\nSometimes\nUnsure, or predictors are correlated"
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html#fitting-and-predicting",
-    "href": "w02_ds_preprocessing.html#fitting-and-predicting",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "6.2 Fitting and Predicting",
-    "text": "6.2 Fitting and Predicting\n\n\nCode\n# Fit on training data\nmail_fit &lt;- fit(mail_wf, data = mail_train)\n\n# Predict on test data\npreds &lt;- augment(mail_fit, new_data = mail_test)\npreds |&gt; select(customer_id, responded, .pred_class, .pred_yes) |&gt; head()\n\n\n\n  \n\n\n\n\n\nCode\n# Classification metrics\nmetrics &lt;- metric_set(accuracy, roc_auc, sens, spec)\n\npreds |&gt;\n  metrics(truth = responded, estimate = .pred_class, .pred_yes)"
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html#exercise-8.1-alternative-imputation",
-    "href": "w02_ds_preprocessing.html#exercise-8.1-alternative-imputation",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "8.1 ✏️ Exercise 8.1 — Alternative Imputation",
-    "text": "8.1 ✏️ Exercise 8.1 — Alternative Imputation\nReplace step_impute_median() with step_impute_mean(). Re-prep the recipe and compare the imputed values. Which would you prefer for income and why?\n\n\nCode\n# Your code here"
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html#exercise-8.2-different-encoding",
-    "href": "w02_ds_preprocessing.html#exercise-8.2-different-encoding",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "8.2 ✏️ Exercise 8.2 — Different Encoding",
-    "text": "8.2 ✏️ Exercise 8.2 — Different Encoding\nloyalty_tier is ordinal (Bronze &lt; Silver &lt; Gold &lt; Platinum). Replace step_dummy() with step_ordinalscore() for loyalty_tier only. Does this change the number of columns in the baked data?\n\n\nCode\n# Hint: use step_ordinalscore() from the recipes package\n# loyalty_tier is currently character. To be converted to ordinal scale, it must be an ordered factor first.\nmail_data &lt;- mail_data |&gt;\n  mutate(\n    loyalty_tier = factor(\n      loyalty_tier,\n      levels = c(\"Bronze\", \"Silver\", \"Gold\", \"Platinum\"),\n      ordered = TRUE\n    )\n  )\n# Your code here"
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html#exercise-8.3-interaction-term",
-    "href": "w02_ds_preprocessing.html#exercise-8.3-interaction-term",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "8.3 ✏️ Exercise 8.3 — Interaction Term",
-    "text": "8.3 ✏️ Exercise 8.3 — Interaction Term\nAdd an interaction between freq_12mo and log10(income) using step_interact(). What is the marketing intuition for this interaction?\n\n\nCode\n# Your code here"
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html#exercise-8.4-remove-a-step",
-    "href": "w02_ds_preprocessing.html#exercise-8.4-remove-a-step",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "8.4 ✏️ Exercise 8.4 — Remove a Step",
-    "text": "8.4 ✏️ Exercise 8.4 — Remove a Step\nRemove step_normalize() from the recipe, retrain the Lasso, and compare roc_auc before and after. What happens to model performance?\n\n\nCode\n# Your code here"
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html#exercise-8.5-stratification-check",
-    "href": "w02_ds_preprocessing.html#exercise-8.5-stratification-check",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "8.5 ✏️ Exercise 8.5 — Stratification Check",
-    "text": "8.5 ✏️ Exercise 8.5 — Stratification Check\nThe split used strata = responded. Remove stratification and re-split five times. Calculate the standard deviation of the response rate in the test sets. Does stratification reduce variance?\n\n\nCode\n# Your code here"
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html#exercise-8.6-data-leakage",
-    "href": "w02_ds_preprocessing.html#exercise-8.6-data-leakage",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "8.6 ✏️ Exercise 8.6 — Data Leakage",
-    "text": "8.6 ✏️ Exercise 8.6 — Data Leakage\nPrep the recipe correctly using mail_train, then bake mail_test. Next, incorrectly prep the same recipe using mail_test. Compare the normalization statistics for income. Why is the second approach considered data leakage?\n\n\nCode\n# Your code here"
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html#exercise-8.7-inspecting-a-recipe",
-    "href": "w02_ds_preprocessing.html#exercise-8.7-inspecting-a-recipe",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "8.7 ✏️ Exercise 8.7 — Inspecting a Recipe",
-    "text": "8.7 ✏️ Exercise 8.7 — Inspecting a Recipe\nUse tidy(mail_prep) to list the recipe steps. Then inspect the imputation values and normalization statistics using tidy(mail_prep, number = 1) and tidy(mail_prep, number = 3). What values were learned during prep()?\n\n\nCode\n# Your code here"
-  },
-  {
-    "objectID": "w02_ds_preprocessing.html#exercise-8.8-variable-roles",
-    "href": "w02_ds_preprocessing.html#exercise-8.8-variable-roles",
-    "title": "Week 2: Data Splitting and Preprocessing with recipes",
-    "section": "8.8 ✏️ Exercise 8.8 — Variable Roles",
-    "text": "8.8 ✏️ Exercise 8.8 — Variable Roles\nRemove update_role(customer_id, new_role = \"ID\") from the recipe and re-prep it. What happens to customer_id in the baked data? Why should an ID variable not be used as a predictor?\n\n\nCode\n# Your code here"
-  },
-  {
     "objectID": "w02_log_assignments.html",
     "href": "w02_log_assignments.html",
     "title": "Week 2 Assignments: Logarithms in R",
     "section": "",
     "text": "Assignments\n   \n  \n  Overview\n  1 Setup\n  2 Assignment L.1 — Dollar to Log\n  3 Assignment L.2 — Log Back to Dollar (Median and Mean)\n  4 Assignment L.3 — Geometric Standard Deviation\n  5 Assignment L.4 — Confirm with Real Data\n  6 Assignment L.5 — Base 10 vs. Natural Log\n  7 Summary\n  \n\n\nOverview\nThese assignments practice the logarithm operations covered in the Week 2 notebook (Section 2.1 — Explaining how Income distribution changes from normal to logged data).\nYou will practice:\n\nConverting dollar values to log scale (log(), log10())\nConverting log-scale values back to dollars (exp())\nComputing the geometric standard deviation (GSD)\nWorking with the real mail_data dataset\nUnderstanding why the choice of log base doesn’t affect modeling\n\n\nReference: Week 2 notebook, Section 2.1 — https://jaejungca.github.io/recipes/w02_ds_preprocessing.html\n\n\n\n\n1 Setup\nRun this chunk first — it loads the packages and recreates the direct-mail dataset used throughout the course.\n\n\nCode\nlibrary(tidyverse)\n\n# ── Recreate the direct-mail dataset ─────────────────────────────────────────\nset.seed(123)\nn &lt;- 3000\n\nmail_data &lt;- tibble(\n  customer_id = paste0(\"C\", str_pad(1:n, 5, pad = \"0\")),\n  age = round(rnorm(n, mean = 45, sd = 12)),\n  income = round(rlnorm(n, meanlog = 10.8, sdlog = 0.6)),\n  recency_days = round(rexp(n, rate = 1 / 60)),\n  freq_12mo = rpois(n, lambda = 3),\n  avg_order_amt = round(rlnorm(n, meanlog = 4.2, sdlog = 0.5), 2),\n  channel = sample(\n    c(\"email\", \"direct_mail\", \"digital\"),\n    n,\n    replace = TRUE,\n    prob = c(0.5, 0.3, 0.2)\n  ),\n  region = sample(\n    c(\"West\", \"South\", \"Midwest\", \"Northeast\"),\n    n,\n    replace = TRUE\n  ),\n  loyalty_tier = sample(\n    c(\"Bronze\", \"Silver\", \"Gold\", \"Platinum\"),\n    n,\n    replace = TRUE,\n    prob = c(0.4, 0.3, 0.2, 0.1)\n  ),\n  responded = rbinom(\n    n,\n    1,\n    prob = plogis(\n      -3 +\n        0.02 * (age - 45) +\n        0.3 * log(income / 50000) +\n        0.1 * freq_12mo -\n        0.005 * recency_days\n    )\n  )\n) |&gt;\n  mutate(\n    income = if_else(runif(n) &lt; 0.08, NA_real_, income),\n    avg_order_amt = if_else(runif(n) &lt; 0.05, NA_real_, avg_order_amt),\n    responded = factor(responded, levels = c(1, 0), labels = c(\"yes\", \"no\"))\n  )\n\nglimpse(mail_data)\n\n\nRows: 3,000\nColumns: 10\n$ customer_id   &lt;chr&gt; \"C00001\", \"C00002\", \"C00003\", \"C00004\", \"C00005\", \"C0000…\n$ age           &lt;dbl&gt; 38, 42, 64, 46, 47, 66, 51, 30, 37, 40, 60, 49, 50, 46, …\n$ income        &lt;dbl&gt; 44793, 40269, 20560, 32261, 233070, 47933, 84804, 43883,…\n$ recency_days  &lt;dbl&gt; 103, 102, 27, 115, 47, 106, 4, 62, 13, 21, 139, 100, 9, …\n$ freq_12mo     &lt;int&gt; 4, 3, 0, 3, 1, 3, 5, 2, 1, 6, 1, 3, 3, 3, 6, 1, 1, 1, 6,…\n$ avg_order_amt &lt;dbl&gt; 80.19, NA, 54.80, 46.49, 64.86, 78.43, 39.45, NA, 68.26,…\n$ channel       &lt;chr&gt; \"email\", \"digital\", \"digital\", \"email\", \"digital\", \"dire…\n$ region        &lt;chr&gt; \"West\", \"South\", \"Northeast\", \"Northeast\", \"Midwest\", \"W…\n$ loyalty_tier  &lt;chr&gt; \"Bronze\", \"Bronze\", \"Bronze\", \"Bronze\", \"Gold\", \"Silver\"…\n$ responded     &lt;fct&gt; no, no, yes, no, yes, yes, no, no, no, no, no, no, no, n…\n\n\n\n\n\n2 Assignment L.1 — Dollar to Log\nCustomer C00005 has an income of $233,070.\n\nConvert this value to the natural log: log(233070)\nConvert this value to log base 10: log10(233070)\nVerify both results using R\nIn your own words, why does the recipe use base = 10 rather than the natural log?\n\n\n\n\n\n\n\nTipHint\n\n\n\nIn R, log(x) computes the natural log (\\(\\ln x\\)) and log10(x) computes log base 10. You can also write log(x, base = 10) — this is exactly what step_log(..., base = 10) uses internally.\n\n\n\n\nCode\n# Your code here\n\n\n\n\n\n3 Assignment L.2 — Log Back to Dollar (Median and Mean)\nThe income variable was generated with meanlog = 10.8 and sdlog = 0.6. These parameters describe the distribution of log(income), not income itself.\n\nConvert the log-scale median (10.8) back to dollars using exp()\nConvert the log-scale mean (10.98) back to dollars using exp()\nVerify these match the formulas from the Week 2 notebook:\n\n\\[\\text{Median} = e^{\\mu} = e^{10.8}\\]\n\\[\\text{Mean} = e^{\\mu + \\sigma^2/2} = e^{10.8 + 0.6^2/2}\\]\n\nWhy is the mean higher than the median on the dollar scale?\n\n\n\n\n\n\n\nTipHint\n\n\n\nexp(x) is the inverse of log(x). If log(income) = 10.8, then exp(10.8) gives you income back in dollars. For the mean, compute 10.8 + 0.6^2 / 2 first, then apply exp().\n\n\n\n\nCode\n# Your code here\n\n\n\n\n\n4 Assignment L.3 — Geometric Standard Deviation\nThe geometric standard deviation (GSD) describes the typical spread of income around the median on the original dollar scale.\n\\[\\text{GSD} = e^{\\sigma} = e^{0.6}\\]\n\nCompute the GSD using exp(0.6)\nUsing the median income from L.2 (~$49,021), compute the typical range:\n\nLower bound: median_income / GSD\nUpper bound: median_income * GSD\n\nVerify this matches the shaded green band in the Week 2 plot (~$26,935 to ~$89,218)\nInterpret this range in plain English: what does it tell a marketer about the “typical” customer in this dataset?\n\n\n\n\n\n\n\nTipHint\n\n\n\nUnlike the regular standard deviation (which adds and subtracts), the GSD multiplies and divides because we are on a multiplicative (log) scale.\n\n\n\n\nCode\n# Your code here\n\n\n\n\n\n5 Assignment L.4 — Confirm with Real Data\nNow verify the theoretical values from L.2 and L.3 against the actual mail_data dataset.\n\nCompute the median and mean of income, removing NAs with na.rm = TRUE. How close are they to the theoretical values?\nCreate a new column called log_income using mutate() and log(). What are the median and mean of log_income?\nApply exp() to the median and mean of log_income. Do you recover the original dollar-scale values? Explain why or why not.\n\n\n\n\n\n\n\nTipHint\n\n\n\nUse summarise() with median() and mean() to compute summary statistics. The theoretical and empirical values may differ slightly because mail_data is a finite random sample — not the infinite population the parameters describe.\n\n\n\n\nCode\n# Step 1: median and mean of income (removing NAs)\n\n# Step 2: create log_income and summarise\n\n# Step 3: back-transform with exp()\n\n\n\n\n\n6 Assignment L.5 — Base 10 vs. Natural Log\nYour recipe uses step_log(..., base = 10). Does the choice of base actually matter for modeling?\n\nFor income values of $10,000, $100,000, and $1,000,000, compute both log() (natural) and log10() for each value\nPresent the results as a tibble with columns: income, log_natural, log_base10\nDivide log_natural by log_base10 for each row. What constant do you get? (Hint: this constant is log(10))\nSince the two columns differ only by a constant, does it matter which base we use for preprocessing? Explain why or why not in terms of what step_normalize() does afterward.\n\n\n\n\n\n\n\nTipHint\n\n\n\nlog(10) ≈ 2.303. Multiplying or dividing by a constant shifts and scales values — but step_normalize() centers and scales anyway, so any constant difference between bases gets absorbed.\n\n\n\n\nCode\n# Step 1 & 2: build the tibble\ntibble(\n  income = c(10000, 100000, 1000000)\n) |&gt;\n  mutate(\n    log_natural = log(income),\n    log_base10 = log10(income)\n  )\n\n# Step 3: compute the ratio\n\n# Step 4: your written explanation here (as a comment)\n\n\n\n\n\n7 Summary\n\n\n\nAssignment\nKey operation\nR function\n\n\n\n\nL.1\nDollar → log\nlog(), log10()\n\n\nL.2\nLog → dollar (median & mean)\nexp()\n\n\nL.3\nGeometric standard deviation\nexp(sdlog)\n\n\nL.4\nEmpirical vs. theoretical values\nmutate(), summarise()\n\n\nL.5\nBase 10 vs. natural log\nlog() / log10() ratio"
-  },
-  {
-    "objectID": "w02_ds_prep_practice.html",
-    "href": "w02_ds_prep_practice.html",
-    "title": "Data Splitting and Preprocessing with Recipes",
-    "section": "",
-    "text": "On this page\n   \n  \n  1 Setup\n  2 The Data Set\n  3 Data Splitting\n  4 Build a Recipe\n  \n\n\n1 Setup\n\n\nCode\nlibrary(tidymodels)\nlibrary(tidyverse)\nlibrary(janitor)\nlibrary(skimr)\n\ntidymodels_prefer()\n\n\n\n\n2 The Data Set\n\n\nCode\n# ── Synthetic direct-mail dataset ──────────────────────────────────────────────\nset.seed(123)\nn &lt;- 3000\n\nmail_data &lt;- tibble(\n  customer_id = paste0(\"C\", str_pad(1:n, 5, pad = \"0\")),\n  age = round(rnorm(n, mean = 45, sd = 12)),\n  income = round(rlnorm(n, meanlog = 10.8, sdlog = 0.6)), # right-skewed\n  recency_days = round(rexp(n, rate = 1 / 60)), # days since last purchase\n  freq_12mo = rpois(n, lambda = 3), # purchases in 12 months\n  avg_order_amt = round(rlnorm(n, meanlog = 4.2, sdlog = 0.5), 2),\n  channel = sample(\n    c(\"email\", \"direct_mail\", \"digital\"),\n    n,\n    replace = TRUE,\n    prob = c(0.5, 0.3, 0.2)\n  ),\n  region = sample(\n    c(\"West\", \"South\", \"Midwest\", \"Northeast\"),\n    n,\n    replace = TRUE\n  ),\n  loyalty_tier = sample(\n    c(\"Bronze\", \"Silver\", \"Gold\", \"Platinum\"),\n    n,\n    replace = TRUE,\n    prob = c(0.4, 0.3, 0.2, 0.1)\n  ),\n  responded = rbinom(\n    n,\n    1,\n    prob = plogis(\n      -3 +\n        0.02 * (age - 45) +\n        0.3 * log(income / 50000) +\n        0.1 * freq_12mo -\n        0.005 * recency_days\n    )\n  )\n) |&gt;\n  mutate(\n    income = if_else(runif(n) &lt; 0.08, NA_real_, income),\n    avg_order_amt = if_else(runif(n) &lt; 0.05, NA_real_, avg_order_amt),\n    responded = factor(responded, levels = c(1, 0), labels = c(\"yes\", \"no\"))\n  )\n# introduce ~8 % missingness in income and avg_order_amt\n\nglimpse(mail_data)\n\n\nRows: 3,000\nColumns: 10\n$ customer_id   &lt;chr&gt; \"C00001\", \"C00002\", \"C00003\", \"C00004\", \"C00005\", \"C0000…\n$ age           &lt;dbl&gt; 38, 42, 64, 46, 47, 66, 51, 30, 37, 40, 60, 49, 50, 46, …\n$ income        &lt;dbl&gt; 44793, 40269, 20560, 32261, 233070, 47933, 84804, 43883,…\n$ recency_days  &lt;dbl&gt; 103, 102, 27, 115, 47, 106, 4, 62, 13, 21, 139, 100, 9, …\n$ freq_12mo     &lt;int&gt; 4, 3, 0, 3, 1, 3, 5, 2, 1, 6, 1, 3, 3, 3, 6, 1, 1, 1, 6,…\n$ avg_order_amt &lt;dbl&gt; 80.19, NA, 54.80, 46.49, 64.86, 78.43, 39.45, NA, 68.26,…\n$ channel       &lt;chr&gt; \"email\", \"digital\", \"digital\", \"email\", \"digital\", \"dire…\n$ region        &lt;chr&gt; \"West\", \"South\", \"Northeast\", \"Northeast\", \"Midwest\", \"W…\n$ loyalty_tier  &lt;chr&gt; \"Bronze\", \"Bronze\", \"Bronze\", \"Bronze\", \"Gold\", \"Silver\"…\n$ responded     &lt;fct&gt; no, no, yes, no, yes, yes, no, no, no, no, no, no, no, n…\n\n\n\n\nCode\nskim(mail_data)\n\n\n\nData summary\n\n\nName\nmail_data\n\n\nNumber of rows\n3000\n\n\nNumber of columns\n10\n\n\n_______________________\n\n\n\nColumn type frequency:\n\n\n\ncharacter\n4\n\n\nfactor\n1\n\n\nnumeric\n5\n\n\n________________________\n\n\n\nGroup variables\nNone\n\n\n\nVariable type: character\n\n\n\n\n\n\n\n\n\n\n\n\n\nskim_variable\nn_missing\ncomplete_rate\nmin\nmax\nempty\nn_unique\nwhitespace\n\n\n\n\ncustomer_id\n0\n1\n6\n6\n0\n3000\n0\n\n\nchannel\n0\n1\n5\n11\n0\n3\n0\n\n\nregion\n0\n1\n4\n9\n0\n4\n0\n\n\nloyalty_tier\n0\n1\n4\n8\n0\n4\n0\n\n\n\nVariable type: factor\n\n\n\n\n\n\n\n\n\n\n\nskim_variable\nn_missing\ncomplete_rate\nordered\nn_unique\ntop_counts\n\n\n\n\nresponded\n0\n1\nFALSE\n2\nno: 2858, yes: 142\n\n\n\nVariable type: numeric\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nskim_variable\nn_missing\ncomplete_rate\nmean\nsd\np0\np25\np50\np75\np100\nhist\n\n\n\n\nage\n0\n1.00\n45.16\n11.92\n8.00\n37.0\n45.00\n53.00\n86.00\n▁▅▇▃▁\n\n\nincome\n240\n0.92\n58349.86\n38521.39\n6924.00\n33242.0\n49331.50\n72438.50\n455628.00\n▇▁▁▁▁\n\n\nrecency_days\n0\n1.00\n60.25\n59.61\n0.00\n18.0\n42.00\n84.00\n515.00\n▇▂▁▁▁\n\n\nfreq_12mo\n0\n1.00\n2.94\n1.71\n0.00\n2.0\n3.00\n4.00\n10.00\n▇▇▂▁▁\n\n\navg_order_amt\n144\n0.95\n75.73\n40.24\n11.67\n47.5\n66.37\n94.71\n443.48\n▇▂▁▁▁\n\n\n\n\n\n\n\n3 Data Splitting\n\n\nCode\nmail_data |&gt;\n  count(responded) |&gt;\n  mutate(percent = n / sum(n))\n\n\n\n  \n\n\n\n\n\nCode\nset.seed(617)\nmail_split &lt;- initial_split(\n    mail_data,\n    prop = 0.8,\n    strata = responded\n)\n\n |&gt; mail_train &lt;- training(mail_split)\nmail_test &lt;- testing(mail_split)\n\n\nError in parse(text = input): &lt;text&gt;:8:2: unexpected '|&gt;'\n7: \n8:  |&gt;\n    ^\n\n\n\n\nCode\nbind_rows(\n  mail_train |&gt; count(responded) |&gt; mutate(set = \"train\"),\n  mail_test |&gt; count(responded) |&gt; mutate(set = \"test\")\n) |&gt;\n  group_by(set) |&gt;\n  mutate(percent = n / sum(n))\n\n\nError:\n! object 'mail_train' not found\n\n\n\n\n4 Build a Recipe\n\n\nCode\nrecipe(responded ~ ., data = mail_train) |&gt;\n  update_role(customer_id, new_role = \"ID\")\n\n\nError:\n! object 'mail_train' not found"
   }
 ]
