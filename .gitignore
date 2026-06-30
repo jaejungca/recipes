@@ -1,6 +1,6 @@
 /.quarto/
 **/*.quarto_ipynb
-*practice.qmd
+w02_ds_prep_practice.qmd
 week*
 answers
 .Rproj.user

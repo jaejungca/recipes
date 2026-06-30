@@ -12,7 +12,7 @@ website:
   navbar:
     background: primary
     foreground: light
-    left:
+    right:
       - href: index.qmd
         text: Home
       - href: w02_video_quiz_combined.qmd
